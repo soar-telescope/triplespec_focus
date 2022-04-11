@@ -1,2 +1,2 @@
 # triplespec_focus
-TripleSpec Focus Calcuculator
+TripleSpec Focus Calculator
