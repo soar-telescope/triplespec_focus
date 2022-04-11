@@ -99,9 +99,6 @@ class TripleSpecFocus(object):
         print(f"Mean: {mean}, Median: {median}, Standard Dev: {std}")
 
         ccd.mask = ccd.data <= (median - self.mask_threshold * std)
-        #     ccd.mask = ccdmask(ccd, byblocks=True)
-        #     ccd.mask = np.ma.masked_all(ccd.data)
-        #     ccd.mask[0:170, 263:679] = 1
 
         color_map = copy.copy(cm.gray)
         color_map.set_bad(color='red')
