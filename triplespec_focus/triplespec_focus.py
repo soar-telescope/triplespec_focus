@@ -78,8 +78,7 @@ class TripleSpecFocus(object):
             if sources is not None:
                 self.valid_sources.append(sources)
 
-        pd_sources = self._sources_to_pandas()
-        print(pd_sources)
+        pd_sources = self.__sources_to_pandas()
         plt.show()
 
         sharpest_image = self.get_sharpest_image(sources=pd_sources)
@@ -183,56 +182,56 @@ class TripleSpecFocus(object):
                     sources[col].info.format = '%.8g'
             #         print(sources)
             sources.pprint_all()
+            if True:  # actually need boolean to trigger plots.
+                positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
+                print(positions)
+                apertures = CircularAperture(positions, r=self.source_fwhm)
 
-            positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
-            print(positions)
+                x = positions[0][0]
+                y = positions[0][1]
+                x_low = int(x - 3 * self.source_fwhm)
+                x_high = int(x + 3 * self.source_fwhm)
+                y_low = int(y - 3 * self.source_fwhm)
+                y_high = int(y + 3 * self.source_fwhm)
+                self.axes[self.i][0].set_title(ccd.header['FILENAME'])
+                self.axes[self.i][0].plot(range(x_low, x_high), ccd.data[int(y), x_low:x_high])
+                self.axes[self.i][0].set_xlabel('X Axis')
+                self.axes[self.i][0].set_ylabel('Counts at row {}'.format(int(y)))
+                self.axes[self.i][1].plot(range(y_low, y_high), ccd.data[y_low:y_high, int(x)])
+                self.axes[self.i][1].set_xlabel('Y Axis')
+                self.axes[self.i][1].set_ylabel('Counts at column {}'.format(int(x)))
+                z1, z2 = scale.get_limits(ccd.data[y_low:y_high, x_low:x_high])
+                self.axes[self.i][2].imshow(ccd.data, clim=(z1, z2), origin='lower', interpolation='nearest')
+                self.axes[self.i][2].set_xlim(x_low, x_high)
+                self.axes[self.i][2].set_ylim(y_low, y_high)
+                self.axes[self.i][2].set_xlabel('X Axis')
+                self.axes[self.i][2].set_ylabel('Y Axis')
 
-            x = positions[0][0]
-            y = positions[0][1]
-            x_low = int(x - 3 * self.source_fwhm)
-            x_high = int(x + 3 * self.source_fwhm)
-            y_low = int(y - 3 * self.source_fwhm)
-            y_high = int(y + 3 * self.source_fwhm)
-            self.axes[self.i][0].set_title(ccd.header['FILENAME'])
-            self.axes[self.i][0].plot(range(x_low, x_high), ccd.data[int(y), x_low:x_high])
-            self.axes[self.i][0].set_xlabel('X Axis')
-            self.axes[self.i][0].set_ylabel('Counts at row {}'.format(int(y)))
-            self.axes[self.i][1].plot(range(y_low, y_high), ccd.data[y_low:y_high, int(x)])
-            self.axes[self.i][1].set_xlabel('Y Axis')
-            self.axes[self.i][1].set_ylabel('Counts at column {}'.format(int(x)))
-            z1, z2 = scale.get_limits(ccd.data[y_low:y_high, x_low:x_high])
-            self.axes[self.i][2].imshow(ccd.data, clim=(z1, z2), origin='lower', interpolation='nearest')
-            self.axes[self.i][2].set_xlim(x_low, x_high)
-            self.axes[self.i][2].set_ylim(y_low, y_high)
-            self.axes[self.i][2].set_xlabel('X Axis')
-            self.axes[self.i][2].set_ylabel('Y Axis')
+                if self.show_source or self.show_mask:
+                    z1, z2 = scale.get_limits(ccd.data)
+                    fig, ax = plt.subplots(figsize=(20, 15))
+                    ax.set_title(ccd.header['FILENAME'])
 
-            z1, z2 = scale.get_limits(ccd.data)
-            apertures = CircularAperture(positions, r=self.source_fwhm)
-            fig, ax = plt.subplots(figsize=(20, 15))
-            ax.set_title(ccd.header['FILENAME'])
+                    if self.show_mask:
+                        masked_data = np.ma.masked_where(ccd.data <= (median - self.mask_threshold * std), ccd.data)
+                        im = ax.imshow(masked_data, cmap=color_map, origin='lower', clim=(z1, z2),
+                                       interpolation='nearest')
+                    else:
+                        im = ax.imshow(ccd.data, cmap=color_map, origin='lower', clim=(z1, z2),
+                                       interpolation='nearest')
+                    apertures.plot(color='blue', lw=1.5, alpha=0.5)
 
-            if self.show_mask:
-                masked_data = np.ma.masked_where(ccd.data <= (median - self.mask_threshold * std), ccd.data)
-                im = ax.imshow(masked_data, cmap=color_map, origin='lower', clim=(z1, z2),
-                               interpolation='nearest')
-            else:
-                im = ax.imshow(ccd.data, cmap=color_map, origin='lower', clim=(z1, z2),
-                               interpolation='nearest')
-            apertures.plot(color='blue', lw=1.5, alpha=0.5)
-
-            divider = make_axes_locatable(ax)
-
-            cax = divider.append_axes('right', size="3%", pad=0.1)
-            plt.colorbar(im, cax=cax)
+                    divider = make_axes_locatable(ax)
+                    
+                    cax = divider.append_axes('right', size="3%", pad=0.1)
+                    plt.colorbar(im, cax=cax)
 
         else:
             print("Unable to detect sources in file: {}".format(ccd.header['FILENAME']))
-
         return sources
 
 
 if __name__ == '__main__':
     files_path = '/home/simon/data/soar/tspec_focus/UT20201122'
     focus = TripleSpecFocus()
-    focus(data_path=files_path, brightest=1, show_mask=True)
+    focus(data_path=files_path, brightest=1, show_mask=False)
