@@ -1,0 +1,9 @@
+setuptools
+astropy
+ccdproc
+matplotlib
+numpy
+pandas
+scipy
+Sphinx
+photutils
