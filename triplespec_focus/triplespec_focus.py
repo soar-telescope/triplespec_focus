@@ -8,13 +8,16 @@ import numpy as np
 import pandas as pd
 
 from astropy.visualization import SqrtStretch, ZScaleInterval, MinMaxInterval
+from astropy.table import QTable
 from ccdproc import ccdmask
 from ccdproc import CCDData
 from ccdproc import trim_image
 from astropy.stats import sigma_clipped_stats
-from pandas import DataFrame
+from pandas import DataFrame, Series
+from pathlib import Path
 from photutils import DAOStarFinder
 from photutils import CircularAperture
+from typing import Union
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
@@ -29,13 +32,14 @@ class TripleSpecFocus(object):
         self.i = None
 
     def __call__(self,
-                 data_path: str,
+                 data_path: Union[str, Path],
                  source_fwhm: float = 10.0,
                  det_threshold: float = 5.0,
                  mask_threshold: float = 1,
                  trim_section: str = '[23:940,115:890]',
                  brightest: int = 1,
-                 show_mask: bool = False):
+                 show_mask: bool = False,
+                 show_source: bool = False):
         """Find focus for triplespec SV camera
 
         Finds best focus for TripleSpec Slit Viewer camera
@@ -48,6 +52,7 @@ class TripleSpecFocus(object):
             trim_section:
             brightest:
             show_mask:
+            show_source:
 
         Returns:
 
@@ -59,6 +64,7 @@ class TripleSpecFocus(object):
         self.trim_section = trim_section
         self.brightest = brightest
         self.show_mask = show_mask
+        self.show_source = show_source
         self.valid_sources = []
 
         file_list = sorted(glob.glob(os.path.join(data_path, '*.fits')))
@@ -68,7 +74,6 @@ class TripleSpecFocus(object):
         for self.i in range(len(file_list)):
             print("Processing file: {}".format(file_list[self.i]))
             ccd = CCDData.read(file_list[self.i], unit='adu')
-            #     print(ccd.data.shape)
             sources = self.detect_sources(ccd)
             if sources is not None:
                 self.valid_sources.append(sources)
@@ -77,7 +82,60 @@ class TripleSpecFocus(object):
         print(pd_sources)
         plt.show()
 
-    def _sources_to_pandas(self) -> DataFrame:
+        sharpest_image = self.get_sharpest_image(sources=pd_sources)
+        print(type(sharpest_image))
+        print(sharpest_image)
+
+    def get_focus_from_sequence(self):
+        """Get best focus from sequence of images
+
+        """
+        pass
+
+    @staticmethod
+    def get_sharpest_image(sources: DataFrame) -> Series:
+        """Finds the sharpest image by a series of criteria
+
+        This method chooses the best image based on the following criteria:
+
+        - Maximum Peak, a star in the best focused image usually has the highest peak intensity.
+        - Maximum Flux, a star in the best focused image usually has the highest flux.
+        - Minimum Magnitude, a star in the best focused image is usually brightest a lower magnitude means brightest.
+        - Roundness2 Closest to 0. According to :py:class:`photutils.detection.core.DAOSTarFinder` best focused image
+          has roundness2 closest to 0.
+
+        All these parameters are considered and the row index is obtained, then the most recurrent index is used to
+        select the row that contains the best image.
+
+        Args:
+            sources (DataFrame): The output of :py:class:`photutils.detection.core.DAOSTarFinder` converted to
+            a :py:class:`pandas.DataFrame`.
+
+        Returns:
+            The row containing the best image as a :py:class:`pandas.Series`.
+
+        """
+        max_peak = sources['peak'].idxmax()
+        max_flux = sources['flux'].idxmax()
+        min_mag = sources['mag'].idxmin()
+        min_roundness_2 = sources['roundness2'].abs().idxmin()
+        print(sources.to_string())
+        print(f"Max Peak {max_peak}")
+        print(f"Max Flux {max_flux}")
+        print(f"Min Mag {min_mag}")
+        print(f"Min roundness2 {min_roundness_2}")
+        arg_best = [max_peak, max_flux, min_mag, min_roundness_2]
+        arg_best_set = set(arg_best)
+        if len(arg_best_set) == 1:
+            return sources.iloc[arg_best[0]]
+        elif len(arg_best_set) == len(arg_best):
+            print("All values are different, Choosing max peak")
+            return sources.iloc[max_peak]
+        else:
+            print("Not all values equal also not all different, choosing the most common.")
+            return sources.iloc[max(arg_best_set, key=arg_best.count)]
+
+    def __sources_to_pandas(self) -> DataFrame:
         """Helper method to convert sources to pandas DataFrame
 
         Returns:
@@ -87,10 +145,10 @@ class TripleSpecFocus(object):
         for source in self.valid_sources:
             pd_source = source.to_pandas()
             all_pandas_sources.append(pd_source)
-        pd_sources = pd.concat(all_pandas_sources)
+        pd_sources = pd.concat(all_pandas_sources).reset_index()
         return pd_sources
 
-    def detect_sources(self, ccd:  CCDData):
+    def detect_sources(self, ccd:  CCDData) -> QTable:
         ccd = trim_image(ccd, fits_section=self.trim_section)
         #     print(ccd.data.shape)
         ccd.write(os.path.join(self.data_path, 'trimmed', ccd.header['FILENAME']), overwrite=True)
