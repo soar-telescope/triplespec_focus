@@ -1,5 +1,9 @@
+import argparse
 import copy
 import glob
+import json
+import logging
+import logging.config
 import os
 
 import matplotlib.cm as cm
@@ -7,9 +11,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from astropy.visualization import SqrtStretch, ZScaleInterval, MinMaxInterval
+from argparse import Namespace
+from astropy.modeling import fitting, models
+from astropy.visualization import ZScaleInterval
 from astropy.table import QTable
-from ccdproc import ccdmask
 from ccdproc import CCDData
 from ccdproc import trim_image
 from astropy.stats import sigma_clipped_stats
@@ -17,11 +22,129 @@ from pandas import DataFrame, Series
 from pathlib import Path
 from photutils import DAOStarFinder
 from photutils import CircularAperture
+from scipy import optimize
 from typing import Union
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 plt.style.use('dark_background')
+
+
+def get_args(arguments: Union[list, None] = None) -> Namespace:
+    parser = argparse.ArgumentParser(
+        description="Get best focus value using a sequence of images with "
+                    "different focus value"
+    )
+
+    parser.add_argument('--data-path',
+                        action='store',
+                        dest='data_path',
+                        default=os.getcwd(),
+                        help='Folder where data is located')
+
+    parser.add_argument('--file-pattern',
+                        action='store',
+                        dest='file_pattern',
+                        default='*.fits',
+                        help='Pattern for filtering files.')
+
+    parser.add_argument('--obstype',
+                        action='store',
+                        dest='obstype',
+                        default='Focus',
+                        help='Only the files whose OBSTYPE matches what you '
+                             'enter here will be used. The default should '
+                             'always work.')
+
+    parser.add_argument('--brightest',
+                        action='store',
+                        dest='brightest',
+                        default=1,
+                        help='Pick N-brightest sources. Default 1.')
+
+    # parser.add_argument('--features-model',
+    #                     action='store',
+    #                     dest='features_model',
+    #                     choices=['gaussian', 'moffat'],
+    #                     default='gaussian',
+    #                     help='Model to use in fitting the features in order to'
+    #                          'obtain the FWHM for each of them')
+
+    parser.add_argument('--plot-results',
+                        action='store_true',
+                        dest='plot_results',
+                        help='Show a plot when it finishes the focus '
+                             'calculation')
+
+    parser.add_argument('--show-mask',
+                        action='store_true',
+                        dest='show_mask',
+                        help='Show the image and the masked areas highlighted in red.')
+
+    parser.add_argument('--debug',
+                        action='store_true',
+                        dest='debug',
+                        help='Activate debug mode')
+
+    args = parser.parse_args(args=arguments)
+    return args
+
+
+def get_sharpest_image(sources: DataFrame) -> Series:
+    """Finds the sharpest image by a series of criteria
+
+    This method chooses the best image based on the following criteria:
+
+    - Maximum Peak, a star in the best focused image usually has the highest peak intensity.
+    - Maximum Flux, a star in the best focused image usually has the highest flux.
+    - Minimum Magnitude, a star in the best focused image is usually brightest a lower magnitude means brightest.
+    - Roundness2 Closest to 0. According to :py:class:`photutils.detection.core.DAOSTarFinder` best focused image
+      has roundness2 closest to 0.
+
+    All these parameters are considered and the row index is obtained, then the most recurrent index is used to
+    select the row that contains the best image.
+
+    Args:
+        sources (DataFrame): The output of :py:class:`photutils.detection.core.DAOSTarFinder` converted to
+        a :py:class:`pandas.DataFrame`.
+
+    Returns:
+        The row containing the best image as a :py:class:`pandas.Series`.
+
+    """
+    max_peak = sources['peak'].idxmax()
+    max_flux = sources['flux'].idxmax()
+    min_mag = sources['mag'].idxmin()
+    min_roundness_2 = sources['roundness2'].abs().idxmin()
+    print(sources.to_string())
+    print(f"Max Peak {max_peak}")
+    print(f"Max Flux {max_flux}")
+    print(f"Min Mag {min_mag}")
+    print(f"Min roundness2 {min_roundness_2}")
+    arg_best = [max_peak, max_flux, min_mag, min_roundness_2]
+    arg_best_set = set(arg_best)
+    if len(arg_best_set) == 1:
+        return sources.iloc[arg_best[0]]
+    elif len(arg_best_set) == len(arg_best):
+        print("All values are different, Choosing max peak")
+        return sources.iloc[max_peak]
+    else:
+        print("Not all values equal also not all different, choosing the most common.")
+        return sources.iloc[max(arg_best_set, key=arg_best.count)]
+
+
+def sources_to_pandas(valid_sources: list[QTable]) -> DataFrame:
+    """Helper method to convert sources to pandas DataFrame
+
+    Returns:
+
+    """
+    all_pandas_sources = []
+    for source in valid_sources:
+        pd_source = source.to_pandas()
+        all_pandas_sources.append(pd_source)
+    pd_sources = pd.concat(all_pandas_sources).reset_index()
+    return pd_sources
 
 
 class TripleSpecFocus(object):
@@ -66,6 +189,12 @@ class TripleSpecFocus(object):
         self.show_mask = show_mask
         self.show_source = show_source
         self.valid_sources = []
+        self.results = []
+
+        self.polynomial = models.Polynomial1D(degree=5)
+        # self.polynomial = models.Gaussian1D()
+        self.fitter = fitting.LevMarLSQFitter()
+        self.linear_fitter = fitting.LinearLSQFitter()
 
         file_list = sorted(glob.glob(os.path.join(data_path, '*.fits')))
 
@@ -78,12 +207,98 @@ class TripleSpecFocus(object):
             if sources is not None:
                 self.valid_sources.append(sources)
 
-        pd_sources = self.__sources_to_pandas()
+        pd_sources = sources_to_pandas(valid_sources=self.valid_sources)
         plt.show()
 
-        sharpest_image = self.get_sharpest_image(sources=pd_sources)
+        sharpest_image = get_sharpest_image(sources=pd_sources)
         print(type(sharpest_image))
         print(sharpest_image)
+
+        best_focus = self.fit_best_focus_by_peak_value(sources=pd_sources)
+        self.results.append({'date': 'focus_group',
+                             'time': '',
+                             'mode_name': 'mode_name',
+                             'notes': '',
+                             'focus': round(best_focus, 10),
+                             # 'fwhm': round(self.__best_fwhm, 10),
+                             # 'best_image_name': self.__best_image,
+                             # 'best_image_focus': round(self.__best_image_focus, 10),
+                             # 'best_image_fwhm': round(self.__best_image_fwhm, 10),
+                             'focus_data': pd_sources['focus'].tolist(),
+                             'mag_data': pd_sources['mag'].tolist()
+                             })
+        return self.results
+
+    def fit_best_focus_by_peak_value(self, sources: DataFrame) -> float:
+        focus = sources['focus'].tolist()
+        peaks = sources['peak'].tolist()
+        mags = sources['mag'].tolist()
+        flux = sources['flux'].tolist()
+        round2 = sources['roundness2'].tolist()
+        sharp = sources['sharpness'].tolist()
+        min_focus = np.min(focus)
+        max_focus = np.max(focus)
+
+        x_axis = np.linspace(min_focus, max_focus, 2000)
+
+        fitted_peaks = self.fitter(self.polynomial, focus, peaks)
+        fitted_mags = self.fitter(self.polynomial, focus, mags)
+        fitted_flux = self.fitter(self.polynomial, focus, flux)
+        fitted_round2 = self.fitter(self.polynomial, focus, round2)
+        fitted_sharp = self.fitter(self.polynomial, focus, sharp)
+
+        modeled_data = fitted_mags(x_axis)
+        index_of_minimum = np.argmin(modeled_data)
+        middle_point = x_axis[index_of_minimum]
+        print(min_focus, middle_point, max_focus)
+
+        best_focus = optimize.brent(fitted_mags, brack=[min_focus, middle_point, max_focus])
+
+        fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2, figsize=(16, 9))
+
+        ax1.set_title("Peaks")
+        ax1.set_xlabel("Focus")
+        ax1.set_ylabel("Peaks")
+        ax1.axvline(best_focus, color='r', label='Best Focus')
+        ax1.plot(focus, peaks, label="data points")
+        ax1.plot(x_axis, fitted_peaks(x_axis), label='Fitted Poly')
+        ax1.legend(loc='best')
+
+        ax2.set_title("Magnitudes")
+        ax2.set_xlabel("Focus")
+        ax2.set_ylabel("Magnitude (instr)")
+        ax2.axvline(best_focus, color='r', label='Best Focus')
+        ax2.plot(focus, mags, label="data points")
+        ax2.plot(x_axis, fitted_mags(x_axis), label='Fitted Poly')
+        ax2.legend(loc='best')
+
+        ax3.set_title("Flux")
+        ax3.set_xlabel("Focus")
+        ax3.axvline(best_focus, color='r', label='Best Focus')
+        ax3.set_ylabel("Flux")
+        ax3.plot(focus, flux, label="data points")
+        ax3.plot(x_axis, fitted_flux(x_axis), label='Fitted Poly')
+        ax3.legend(loc='best')
+
+        ax4.set_title("Roundness2")
+        ax4.set_xlabel("Focus")
+        ax4.set_ylabel("Roundness 2")
+        ax4.axvline(best_focus, color='r', label='Best Focus')
+        ax4.plot(focus, round2, label="data points")
+        ax4.plot(x_axis, fitted_round2(x_axis), label='Fitted Poly')
+        ax4.legend(loc='best')
+
+        ax5.set_title("Sharpness")
+        ax5.set_xlabel("Focus")
+        ax5.set_ylabel("Sharpness")
+        ax5.axvline(best_focus, color='r', label='Best Focus')
+        ax5.plot(focus, sharp, label="data points")
+        ax5.plot(x_axis, fitted_sharp(x_axis), label='Fitted Poly')
+        ax5.legend(loc='best')
+
+        plt.tight_layout()
+        plt.show()
+        return best_focus
 
     def get_focus_from_sequence(self):
         """Get best focus from sequence of images
@@ -91,67 +306,11 @@ class TripleSpecFocus(object):
         """
         pass
 
-    @staticmethod
-    def get_sharpest_image(sources: DataFrame) -> Series:
-        """Finds the sharpest image by a series of criteria
-
-        This method chooses the best image based on the following criteria:
-
-        - Maximum Peak, a star in the best focused image usually has the highest peak intensity.
-        - Maximum Flux, a star in the best focused image usually has the highest flux.
-        - Minimum Magnitude, a star in the best focused image is usually brightest a lower magnitude means brightest.
-        - Roundness2 Closest to 0. According to :py:class:`photutils.detection.core.DAOSTarFinder` best focused image
-          has roundness2 closest to 0.
-
-        All these parameters are considered and the row index is obtained, then the most recurrent index is used to
-        select the row that contains the best image.
-
-        Args:
-            sources (DataFrame): The output of :py:class:`photutils.detection.core.DAOSTarFinder` converted to
-            a :py:class:`pandas.DataFrame`.
-
-        Returns:
-            The row containing the best image as a :py:class:`pandas.Series`.
-
-        """
-        max_peak = sources['peak'].idxmax()
-        max_flux = sources['flux'].idxmax()
-        min_mag = sources['mag'].idxmin()
-        min_roundness_2 = sources['roundness2'].abs().idxmin()
-        print(sources.to_string())
-        print(f"Max Peak {max_peak}")
-        print(f"Max Flux {max_flux}")
-        print(f"Min Mag {min_mag}")
-        print(f"Min roundness2 {min_roundness_2}")
-        arg_best = [max_peak, max_flux, min_mag, min_roundness_2]
-        arg_best_set = set(arg_best)
-        if len(arg_best_set) == 1:
-            return sources.iloc[arg_best[0]]
-        elif len(arg_best_set) == len(arg_best):
-            print("All values are different, Choosing max peak")
-            return sources.iloc[max_peak]
-        else:
-            print("Not all values equal also not all different, choosing the most common.")
-            return sources.iloc[max(arg_best_set, key=arg_best.count)]
-
-    def __sources_to_pandas(self) -> DataFrame:
-        """Helper method to convert sources to pandas DataFrame
-
-        Returns:
-
-        """
-        all_pandas_sources = []
-        for source in self.valid_sources:
-            pd_source = source.to_pandas()
-            all_pandas_sources.append(pd_source)
-        pd_sources = pd.concat(all_pandas_sources).reset_index()
-        return pd_sources
-
-    def detect_sources(self, ccd:  CCDData) -> QTable:
+    def detect_sources(self, ccd: CCDData) -> QTable:
         ccd = trim_image(ccd, fits_section=self.trim_section)
-        #     print(ccd.data.shape)
+        # print(ccd.data.shape)
         ccd.write(os.path.join(self.data_path, 'trimmed', ccd.header['FILENAME']), overwrite=True)
-        #     show_files(ccd)
+        # show_files(ccd)
         mean, median, std = sigma_clipped_stats(ccd.data, sigma=3.0)
         print(f"Mean: {mean}, Median: {median}, Standard Dev: {std}")
 
@@ -222,7 +381,6 @@ class TripleSpecFocus(object):
                     apertures.plot(color='blue', lw=1.5, alpha=0.5)
 
                     divider = make_axes_locatable(ax)
-                    
                     cax = divider.append_axes('right', size="3%", pad=0.1)
                     plt.colorbar(im, cax=cax)
 
@@ -231,7 +389,24 @@ class TripleSpecFocus(object):
         return sources
 
 
+def run_triplespec_focus(args=None):
+    args = get_args(arguments=args)
+    LOG_FORMAT = '[%(asctime)s][%(levelname)s]: %(message)s'
+    LOG_LEVEL = logging.INFO
+
+    DATE_FORMAT = '%H:%M:%S'
+
+    logging.basicConfig(level=LOG_LEVEL,
+                        format=LOG_FORMAT,
+                        datefmt=DATE_FORMAT)
+
+    log = logging.getLogger(__name__)
+
+    focus = TripleSpecFocus()
+    results = focus(data_path=args.data_path, brightest=args.brightest, show_mask=args.show_mask)
+    log.info(json.dumps(results, indent=4))
+
+
 if __name__ == '__main__':
     files_path = '/home/simon/data/soar/tspec_focus/UT20201122'
-    focus = TripleSpecFocus()
-    focus(data_path=files_path, brightest=1, show_mask=False)
+    run_triplespec_focus()
