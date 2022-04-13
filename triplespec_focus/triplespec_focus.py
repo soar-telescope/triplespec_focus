@@ -24,7 +24,7 @@ from pathlib import Path
 from photutils import DAOStarFinder
 from photutils import CircularAperture
 from scipy import optimize
-from typing import Union
+from typing import Union, List
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
@@ -152,7 +152,7 @@ def setup_logging(debug: bool = False) -> Logger:
     return logger
 
 
-def sources_to_pandas(valid_sources: list[QTable]) -> DataFrame:
+def sources_to_pandas(valid_sources: List[QTable]) -> DataFrame:
     """Helper method to convert sources to pandas DataFrame
 
     Returns:
@@ -183,7 +183,7 @@ class TripleSpecFocus(object):
                  brightest: int = 1,
                  show_mask: bool = False,
                  show_source: bool = False,
-                 plots: bool = False) -> list[dict]:
+                 plots: bool = False) -> List[dict]:
         """Find focus for triplespec SV camera
 
         Finds best focus for TripleSpec Slit Viewer camera
