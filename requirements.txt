@@ -6,4 +6,5 @@ numpy
 pandas
 scipy
 Sphinx
+sphinxcontrib.napoleon
 photutils
