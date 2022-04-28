@@ -14,7 +14,12 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-__version__ = __import__('triplespec_focus').__version__
+from importlib.metadata import version as get_version
+from importlib.metadata import PackageNotFoundError
+try:
+    __version__ = get_version('triplespec_focus')
+except PackageNotFoundError:
+    __version__ = '0.0.0'
 
 # -- Project information -----------------------------------------------------
 
@@ -24,7 +29,6 @@ author = 'Simon Torres'
 license = 'bsd3'
 
 # The full version, including alpha/beta/rc tags
-version = '.'.join(__version__.split('.')[:2])
 release = __version__
 
 
@@ -36,13 +40,18 @@ release = __version__
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
-    'sphinxcontrib.napoleon',
+    'sphinx.ext.napoleon',
     'matplotlib.sphinxext.plot_directive',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
+
+source_suffix = ['.rst']
+
+
+master_doc = 'index'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.

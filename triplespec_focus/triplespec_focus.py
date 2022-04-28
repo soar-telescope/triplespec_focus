@@ -109,12 +109,13 @@ def get_sharpest_image(sources: DataFrame) -> Series:
 
     Args:
         sources (DataFrame): The output of :py:class:`photutils.detection.core.DAOSTarFinder` converted to
-        a :py:class:`pandas.DataFrame`.
+         a :py:class:`pandas.DataFrame`.
 
     Returns:
         The row containing the best image as a :py:class:`pandas.Series`.
 
     """
+
     max_peak = sources['peak'].idxmax()
     max_flux = sources['flux'].idxmax()
     min_mag = sources['mag'].idxmin()
