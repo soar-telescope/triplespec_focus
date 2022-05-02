@@ -109,12 +109,13 @@ def get_sharpest_image(sources: DataFrame) -> Series:
 
     Args:
         sources (DataFrame): The output of :py:class:`photutils.detection.core.DAOSTarFinder` converted to
-        a :py:class:`pandas.DataFrame`.
+         a :py:class:`pandas.DataFrame`.
 
     Returns:
         The row containing the best image as a :py:class:`pandas.Series`.
 
     """
+
     max_peak = sources['peak'].idxmax()
     max_flux = sources['flux'].idxmax()
     min_mag = sources['mag'].idxmin()
@@ -162,7 +163,7 @@ def sources_to_pandas(valid_sources: List[QTable]) -> DataFrame:
     for source in valid_sources:
         pd_source = source.to_pandas()
         all_pandas_sources.append(pd_source)
-    pd_sources = pd.concat(all_pandas_sources).reset_index()
+    pd_sources = pd.concat(all_pandas_sources).sort_values(by='focus').reset_index()
     return pd_sources
 
 
@@ -171,6 +172,7 @@ class TripleSpecFocus(object):
     def __init__(self, debug: bool = False) -> None:
         self.fig = None
         self.valid_sources = None
+        self.saturation_level = 90000.
         self.i = None
         self.log = setup_logging(debug=debug)
 
@@ -179,15 +181,17 @@ class TripleSpecFocus(object):
                  source_fwhm: float = 10.0,
                  det_threshold: float = 5.0,
                  mask_threshold: float = 1,
-                 trim_section: str = '[23:940,115:890]',
+                 trim_section: str = '[272:690,472:890]',
                  brightest: int = 1,
+                 saturation_level: float = 90000.,
                  show_mask: bool = False,
                  show_source: bool = False,
                  plots: bool = False) -> List[dict]:
         """Find focus for triplespec SV camera
 
         Finds best focus for TripleSpec Slit Viewer camera
-
+        Illuminated Section: '[23:940,115:890]'
+        Best Region of Interest: '[272:690,472:890]'
         Args:
             data_path:
             source_fwhm:
@@ -207,6 +211,7 @@ class TripleSpecFocus(object):
         self.mask_threshold = mask_threshold
         self.trim_section = trim_section
         self.brightest = brightest
+        self.saturation_level = saturation_level
         self.show_mask = show_mask
         self.show_source = show_source
         self.plots = plots
@@ -236,7 +241,9 @@ class TripleSpecFocus(object):
 
         sharpest_image = get_sharpest_image(sources=pd_sources)
         # print(type(sharpest_image))
-        # print(sharpest_image)
+        print(sharpest_image)
+
+        # define coordinates for selected star and recall DAOStarFinder with xycoords and brightest=1
 
         best_focus = self.fit_best_focus_by_instrumental_magnitude(sources=pd_sources, plots=self.plots)
         self.results.append({'date': 'focus_group',
@@ -336,7 +343,7 @@ class TripleSpecFocus(object):
 
     def detect_sources(self, ccd: CCDData, plots: bool = False) -> QTable:
         ccd = trim_image(ccd, fits_section=self.trim_section)
-        # print(ccd.data.shape)
+        print(ccd.data.shape)
         ccd.write(os.path.join(self.data_path, 'trimmed', ccd.header['FILENAME']), overwrite=True)
         # show_files(ccd)
         mean, median, std = sigma_clipped_stats(ccd.data, sigma=3.0)
@@ -357,7 +364,9 @@ class TripleSpecFocus(object):
         daofind = DAOStarFinder(fwhm=self.source_fwhm,
                                 threshold=median + self.det_threshold * std,
                                 exclude_border=True,
-                                brightest=self.brightest)
+                                brightest=None,
+                                peakmax=self.saturation_level)
+                                # brightest=self.brightest)
         sources = daofind(ccd.data - median, mask=ccd.mask)
 
         if sources is not None:
@@ -372,12 +381,25 @@ class TripleSpecFocus(object):
                 positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
                 apertures = CircularAperture(positions, r=self.source_fwhm)
 
+                width, height = ccd.data.shape
+                print(width, height)
+
+                factor = 3
+
                 x = positions[0][0]
                 y = positions[0][1]
-                x_low = int(x - 3 * self.source_fwhm)
-                x_high = int(x + 3 * self.source_fwhm)
-                y_low = int(y - 3 * self.source_fwhm)
-                y_high = int(y + 3 * self.source_fwhm)
+                x_high = np.min([width, int(x + factor * self.source_fwhm)])
+                y_high = np.min([height, int(y + factor * self.source_fwhm)])
+
+                # make sure the sample has the same size
+                x_low0 = np.min([int(x - factor * self.source_fwhm), int(x_high - 2 * factor * self.source_fwhm)])
+                y_low0 = np.min([int(y - factor * self.source_fwhm), int(y_high - 2 * factor * self.source_fwhm)])
+
+                # Make sure the indexes are positive
+                x_low = np.max([0, x_low0])
+                y_low = np.max([0, y_low0])
+
+                print(f"x: {x} y: {y} x_low: {x_low} x_high: {x_high} y_low: {y_low} y_high: {y_high}")
                 self.axes[self.i][0].set_title(ccd.header['FILENAME'])
                 self.axes[self.i][0].plot(range(x_low, x_high), ccd.data[int(y), x_low:x_high])
                 self.axes[self.i][0].set_xlabel('X Axis')
@@ -419,7 +441,7 @@ def run_triplespec_focus(args=None):
     args = get_args(arguments=args)
 
     focus = TripleSpecFocus(debug=args.debug)
-    results = focus(data_path=args.data_path, brightest=args.brightest, show_mask=args.show_mask)
+    results = focus(data_path=args.data_path, brightest=args.brightest, show_mask=args.show_mask, show_source=True, plots=True)
     log.info(json.dumps(results, indent=4))
 
 

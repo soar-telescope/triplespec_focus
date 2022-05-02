@@ -1,7 +1,7 @@
 import os
 
 from codecs import open
-from setuptools import setup
+from setuptools import find_packages, setup
 
 try:
     from ConfigParser import ConfigParser
@@ -32,9 +32,7 @@ CONF.read([os.path.join(os.path.dirname(__file__), 'setup.cfg')])
 
 metadata = dict(CONF.items('metadata'))
 
-PACKAGENAME = metadata['package_name']
-
-VERSION = metadata['version']
+PACKAGENAME = metadata['name']
 
 LICENSE = metadata['license']
 
@@ -48,16 +46,20 @@ AUTHOR = metadata['author']
 
 AUTHOR_EMAIL = metadata['author_email']
 
-INSTALL_REQUIRES = metadata['install_requires'].split()
+options = dict(CONF.items('options'))
+
+INSTALL_REQUIRES = options['install_requires'].split()
+
+SETUP_REQUIRES = options['setup_requires'].split()
 
 # freezes version information in version.py
-create_version_py(PACKAGENAME, VERSION)
+# create_version_py(PACKAGENAME, VERSION)
 
 
 setup(
-    name=metadata['package_name'],
+    name=PACKAGENAME,
 
-    version=VERSION,
+    use_scm_version=True,
 
     description=DESCRIPTION,
 
@@ -76,13 +78,13 @@ setup(
     # Choose your license
     license=LICENSE,
 
-    packages=['triplespec_focus'],
-
-    package_dir={'triplespec_focus': 'triplespec_focus'},
+    packages=find_packages(exclude=['tests']),
 
     python_requires=">=3.6",
 
     install_requires=INSTALL_REQUIRES,
+
+    setup_requires=SETUP_REQUIRES,
 
     entry_points={
         'console_scripts': [

@@ -20,3 +20,7 @@ class TripleSpecFocusTest(TestCase):
 
     def test_focus(self):
         pass
+
+
+def test_something():
+    pass
