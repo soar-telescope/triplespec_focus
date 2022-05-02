@@ -10,5 +10,6 @@ dependencies:
   - pip:
       - ccdproc
       - coveralls
+      - photutils
       - sphinx_rtd_theme
       - sphinx
