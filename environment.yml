@@ -1,6 +1,5 @@
 name: triplespec_focus
 dependencies:
-  - python="3.10"
   - astropy
   - matplotlib
   - numpy
