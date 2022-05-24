@@ -6,6 +6,7 @@ import logging
 import logging.config
 import os
 
+import matplotlib
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
@@ -296,6 +297,7 @@ class TripleSpecFocus(object):
 
         if self.plot_results:
             scale = ZScaleInterval()
+            matplotlib.rc('axes', edgecolor='red')
             for cid in cluster_ids:
                 cluster = self.sources_df[self.sources_df['cluster_id'] == cid]
                 file_list = cluster['filename'].tolist()
@@ -305,6 +307,12 @@ class TripleSpecFocus(object):
                 x = cluster['xcentroid'].mean()
                 y = cluster['ycentroid'].mean()
                 for index, r in cluster.iterrows():
+                    print(r['filename'], best_image, r['filename'] == best_image)
+                    if r['filename'] == best_image:
+                        is_best_focus = True
+                    else:
+                        is_best_focus = False
+                    print(f"Is best focus: {is_best_focus}")
                     ccd = CCDData.read(os.path.join(self.data_path, r['filename']), unit='adu')
 
                     width, height = ccd.data.shape
@@ -324,6 +332,12 @@ class TripleSpecFocus(object):
                     self.log.debug(f"x: {x} y: {y} x_low: {x_low} x_high: {x_high} y_low: {y_low} y_high: {y_high}")
                     fig.suptitle(f"Best Focus: {mean_focus:.2f} {best_image}", fontsize=20)
                     # axes[i][0].set_title(ccd.header['FILENAME'])
+                    if is_best_focus:
+                        for e in [0, 1, 2]:
+                            axes[i][e].spines['top'].set_color('#00c513')
+                            axes[i][e].spines['left'].set_color('#00c513')
+                            axes[i][e].spines['right'].set_color('#00c513')
+                            axes[i][e].spines['bottom'].set_color('#00c513')
                     axes[i][0].plot(range(x_low, x_high), ccd.data[int(y), x_low:x_high])
                     axes[i][0].set_xlabel('X')
                     # axes[i][0].set_ylabel('Counts at row {}'.format(int(y)))
@@ -331,6 +345,7 @@ class TripleSpecFocus(object):
                     axes[i][1].set_xlabel('Y')
                     # axes[i][1].set_ylabel('Counts at column {}'.format(int(x)))
                     z1, z2 = scale.get_limits(ccd.data[y_low:y_high, x_low:x_high])
+
                     axes[i][2].set_xticks([])
                     axes[i][2].set_yticks([])
                     axes[i][2].imshow(ccd.data, clim=(z1, z2), origin='lower', interpolation='nearest')
