@@ -196,7 +196,7 @@ class TripleSpecFocus(object):
     def __call__(self,
                  data_path: Union[str, Path],
                  file_list: List = [],
-                 source_fwhm: float = 10.0,
+                 source_fwhm: float = 5.0,
                  det_threshold: float = 5.0,
                  mask_threshold: float = 1,
                  trim_section: str = '[272:690,472:890]',
@@ -206,7 +206,8 @@ class TripleSpecFocus(object):
                  show_mask: bool = False,
                  show_source: bool = False,
                  plot_results: bool = False,
-                 debug_plots: bool = False) -> List[dict]:
+                 debug_plots: bool = False,
+                 print_all_data: bool = False) -> List[dict]:
         """Find focus for triplespec SV camera
 
         Finds best focus for TripleSpec Slit Viewer camera
@@ -357,6 +358,8 @@ class TripleSpecFocus(object):
                 plt.tight_layout(rect=(0.04, 0.067, 1, 0.929))
                 plt.show()
 
+        if print_all_data:
+            print(self.sources_df.to_string())
         return self.results
 
     def __sigma_clip_dataframe(self, lower: float = 2, upper: float = 1) -> Tuple[DataFrame, DataFrame]:
