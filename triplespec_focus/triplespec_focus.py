@@ -19,7 +19,7 @@ from astropy.visualization import ZScaleInterval
 from ccdproc import CCDData
 from logging import Logger
 from numpy import unique, where
-from pandas import DataFrame, Series
+from pandas import DataFrame
 from pathlib import Path
 from photutils import DAOStarFinder
 from photutils import CircularAperture
@@ -99,48 +99,48 @@ def get_args(arguments: Union[list, None] = None) -> Namespace:
     return args
 
 
-def get_sharpest_image(sources: DataFrame) -> Series:
-    """Finds the sharpest image by a series of criteria
-
-    This method chooses the best image based on the following criteria:
-
-    - Maximum Peak, a star in the best focused image usually has the highest peak intensity.
-    - Maximum Flux, a star in the best focused image usually has the highest flux.
-    - Minimum Magnitude, a star in the best focused image is usually brightest a lower magnitude means brightest.
-    - Roundness2 Closest to 0. According to :py:class:`photutils.detection.core.DAOSTarFinder` best focused image
-      has roundness2 closest to 0.
-
-    All these parameters are considered and the row index is obtained, then the most recurrent index is used to
-    select the row that contains the best image.
-
-    Args:
-        sources (DataFrame): The output of :py:class:`photutils.detection.core.DAOSTarFinder` converted to
-         a :py:class:`pandas.DataFrame`.
-
-    Returns:
-        The row containing the best image as a :py:class:`pandas.Series`.
-
-    """
-
-    max_peak = sources['peak'].idxmax()
-    max_flux = sources['flux'].idxmax()
-    min_mag = sources['mag'].idxmin()
-    min_roundness_2 = sources['roundness2'].abs().idxmin()
-    log.debug(sources.to_string())
-    log.debug(f"Max Peak {max_peak}")
-    log.debug(f"Max Flux {max_flux}")
-    log.debug(f"Min Mag {min_mag}")
-    log.debug(f"Min roundness2 {min_roundness_2}")
-    arg_best = [max_peak, max_flux, min_mag, min_roundness_2]
-    arg_best_set = set(arg_best)
-    if len(arg_best_set) == 1:
-        return sources.iloc[arg_best[0]]
-    elif len(arg_best_set) == len(arg_best):
-        log.warning("All values are different, Choosing max peak")
-        return sources.iloc[max_peak]
-    else:
-        log.warning("Not all values equal also not all different, choosing the most common.")
-        return sources.iloc[max(arg_best_set, key=arg_best.count)]
+# def get_sharpest_image(sources: DataFrame) -> Series:
+#     """Finds the sharpest image by a series of criteria
+#
+#     This method chooses the best image based on the following criteria:
+#
+#     - Maximum Peak, a star in the best focused image usually has the highest peak intensity.
+#     - Maximum Flux, a star in the best focused image usually has the highest flux.
+#     - Minimum Magnitude, a star in the best focused image is usually brightest a lower magnitude means brightest.
+#     - Roundness2 Closest to 0. According to :py:class:`photutils.detection.core.DAOSTarFinder` best focused image
+#       has roundness2 closest to 0.
+#
+#     All these parameters are considered and the row index is obtained, then the most recurrent index is used to
+#     select the row that contains the best image.
+#
+#     Args:
+#         sources (DataFrame): The output of :py:class:`photutils.detection.core.DAOSTarFinder` converted to
+#          a :py:class:`pandas.DataFrame`.
+#
+#     Returns:
+#         The row containing the best image as a :py:class:`pandas.Series`.
+#
+#     """
+#
+#     max_peak = sources['peak'].idxmax()
+#     max_flux = sources['flux'].idxmax()
+#     min_mag = sources['mag'].idxmin()
+#     min_roundness_2 = sources['roundness2'].abs().idxmin()
+#     log.debug(sources.to_string())
+#     log.debug(f"Max Peak {max_peak}")
+#     log.debug(f"Max Flux {max_flux}")
+#     log.debug(f"Min Mag {min_mag}")
+#     log.debug(f"Min roundness2 {min_roundness_2}")
+#     arg_best = [max_peak, max_flux, min_mag, min_roundness_2]
+#     arg_best_set = set(arg_best)
+#     if len(arg_best_set) == 1:
+#         return sources.iloc[arg_best[0]]
+#     elif len(arg_best_set) == len(arg_best):
+#         log.warning("All values are different, Choosing max peak")
+#         return sources.iloc[max_peak]
+#     else:
+#         log.warning("Not all values equal also not all different, choosing the most common.")
+#         return sources.iloc[max(arg_best_set, key=arg_best.count)]
 
 
 def setup_logging(debug: bool = False) -> Logger:
@@ -188,8 +188,6 @@ class TripleSpecFocus(object):
         self.log = setup_logging(debug=debug)
         self.max_sources_count: int = 0
         self.minimum_sources: int = 6
-        self.cluster_count: int = 0
-        self.profile_model = models.Gaussian2D()
         self.fitter = fitting.LevMarLSQFitter()
         self.plot_results: bool = plot_results
         self.debug_plots: bool = debug_plots
@@ -240,10 +238,7 @@ class TripleSpecFocus(object):
         self.plot_results: bool = plot_results
         self.results = []
 
-        self.polynomial = models.Polynomial1D(degree=2)
-        # self.polynomial = models.Gaussian1D()
-        # self.fitter = fitting.LevMarLSQFitter()
-        self.linear_fitter = fitting.LinearLSQFitter()
+        self.polynomial = models.Polynomial1D(degree=5)
 
         self.file_list = sorted(glob.glob(os.path.join(data_path, '*.fits')))
 
@@ -286,7 +281,6 @@ class TripleSpecFocus(object):
 
         self.results.append({'date': 'focus_group',
                              'time': '',
-                             'mode_name': 'mode_name',
                              'notes': '',
                              'mean_focus': round(mean_focus, 10),
                              'median_focus': round(median_focus, 10),
@@ -350,15 +344,6 @@ class TripleSpecFocus(object):
 
         return self.results
 
-    def _get_cluster_stats(self, cluster: DataFrame):
-        """Get the centroid positions and dispersion"""
-        centroids_x = []
-        centroids_y = []
-        centroids = cluster.loc[:, ['xcentroid', 'ycentroid']].mean(axis=0)
-
-        centroids_x.append(centroids['xcentroid'])
-        centroids_y.append(centroids['ycentroid'])
-
     def __sigma_clip_dataframe(self, lower: float = 2, upper: float = 1) -> Tuple[DataFrame, DataFrame]:
         cluster_std = self.sources_df['cluster_std'].unique().tolist()
         cluster_mean = np.average(cluster_std)
@@ -369,7 +354,6 @@ class TripleSpecFocus(object):
                                            (self.sources_df['cluster_std'] <= upper_limit)]
         rejected_sources = self.sources_df[(self.sources_df['cluster_std'] < lower_limit) |
                                            (self.sources_df['cluster_std'] > upper_limit)]
-        self.cluster_count = selected_sources['cluster_id'].unique().shape[0]
         return selected_sources, rejected_sources
 
     def __fit_2d_spatial_profile(self):
@@ -418,7 +402,6 @@ class TripleSpecFocus(object):
         self.sources_df['source_fwhm_y'] = -1
 
         cluster_ids = unique(fitted_model)
-        self.cluster_count = self.sources_df['cluster_id'].unique().shape[0]
 
         centroids_x = []
         centroids_y = []
@@ -573,12 +556,6 @@ class TripleSpecFocus(object):
             plt.show()
         return best_focus
 
-    def get_focus_from_sequence(self):
-        """Get best focus from sequence of images
-
-        """
-        pass
-
     def detect_sources(self, ccd: CCDData, debug_plots: bool = False) -> QTable:
         mean, median, std = sigma_clipped_stats(ccd.data, sigma=3.0)
         self.log.debug(f"Mean: {mean}, Median: {median}, Standard Dev: {std}")
@@ -645,5 +622,4 @@ def run_triplespec_focus(args=None):
 
 
 if __name__ == '__main__':
-    files_path = '/home/simon/data/soar/tspec_focus/UT20201122'
     run_triplespec_focus()
