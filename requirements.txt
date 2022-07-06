@@ -4,6 +4,7 @@ ccdproc
 matplotlib
 numpy
 pandas
+scikit-learn
 scipy
 Sphinx
 photutils
