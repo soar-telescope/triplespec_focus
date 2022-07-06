@@ -363,6 +363,17 @@ class TripleSpecFocus(object):
         return self.results
 
     def __sigma_clip_dataframe(self, lower: float = 2, upper: float = 1) -> Tuple[DataFrame, DataFrame]:
+        """
+        It takes a dataframe, and returns two dataframes, one with the sources that are within the limits of the mean and
+        standard deviation of the cluster_std column, and one with the sources that are outside of those limits
+
+        Args:
+          lower (float): float = 2, upper: float = 1. Defaults to 2
+          upper (float): float = 1. Defaults to 1
+
+        Returns:
+          A tuple of two dataframes.
+        """
         cluster_std = self.sources_df['cluster_std'].unique().tolist()
         cluster_mean = np.average(cluster_std)
         cluster_std = np.std(cluster_std)
@@ -375,6 +386,10 @@ class TripleSpecFocus(object):
         return selected_sources, rejected_sources
 
     def __fit_2d_spatial_profile(self):
+        """
+        It takes a list of files, and for each file, it takes a list of sources, and for each source, it fits a 2D Gaussian
+        to the source
+        """
         files = self.sources_df['filename'].unique().tolist()
 
         for file_name in files:
@@ -395,6 +410,15 @@ class TripleSpecFocus(object):
                 self.sources_df.loc[index, 'source_fwhm_y'] = fitted_model.y_stddev.value
 
     def __get_best_image(self, best_focus: float):
+        """
+        It takes the best focus value from the previous function and finds the image with the closest focus value to it
+
+        Args:
+          best_focus (float): The focus value that you want to use to find the best image.
+
+        Returns:
+          The best image is being returned.
+        """
         focus_values = self.sources_df['focus'].unique().tolist()
         arg_best_focus = np.argmin([np.abs(i - best_focus) for i in focus_values])
 
@@ -632,6 +656,11 @@ class TripleSpecFocus(object):
 
 
 def run_triplespec_focus(args=None):
+    """
+    It takes a directory of TripleSpec data, finds the brightest source, and returns the focus position
+
+    :param args: The arguments passed to the script
+    """
     args = get_args(arguments=args)
 
     focus = TripleSpecFocus(debug=args.debug, debug_plots=args.debug_plots)
