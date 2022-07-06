@@ -440,6 +440,7 @@ class TripleSpecFocus(object):
         fitted_model = model.fit_predict(data)
         self.sources_df['cluster_id'] = fitted_model
         self.sources_df['cluster_std'] = -1
+        self.sources_df['fwhm'] = (2.355 * self.sources_df['flux'])/(np.sqrt(2 * np.pi) * self.sources_df['peak'])
         self.sources_df['source_fwhm_x'] = -1
         self.sources_df['source_fwhm_y'] = -1
 
@@ -523,6 +524,7 @@ class TripleSpecFocus(object):
         mags = cluster['mag'].tolist()
         flux = cluster['flux'].tolist()
         round2 = cluster['roundness2'].tolist()
+        fwhm = cluster['fwhm'].tolist()
         sharp = cluster['sharpness'].tolist()
         min_focus = np.min(focus)
         max_focus = np.max(focus)
@@ -549,6 +551,7 @@ class TripleSpecFocus(object):
         if debug_plots:
             fitted_peaks = self.fitter(self.polynomial, focus, peaks)
             fitted_flux = self.fitter(self.polynomial, focus, flux)
+            fitted_fwhm = self.fitter(self.polynomial, focus, fwhm)
             fitted_round2 = self.fitter(self.polynomial, focus, round2)
             fitted_sharp = self.fitter(self.polynomial, focus, sharp)
 
@@ -593,6 +596,14 @@ class TripleSpecFocus(object):
             ax5.plot(focus, sharp, label="data points")
             ax5.plot(x_axis, fitted_sharp(x_axis), label='Fitted Poly')
             ax5.legend(loc='best')
+
+            ax6.set_title("FWHM")
+            ax6.set_xlabel("Focus")
+            ax6.set_ylabel("FWHM")
+            ax6.axvline(best_focus, color='r', label='Best Focus')
+            ax6.plot(focus, fwhm, label="data points")
+            ax6.plot(x_axis, fitted_fwhm(x_axis), label='Fitted Poly')
+            ax6.legend(loc='best')
 
             plt.tight_layout()
             plt.show()
