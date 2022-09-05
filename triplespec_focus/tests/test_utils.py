@@ -170,11 +170,13 @@ class TestFastBestImageDetection(TestCase):
             ccd.header.set('FILENAME', value=_file, comment="This file name")
             ccd.header.set('PEAK', value=peaks[i - 1], comment="This file set peak value")
             ccd.header.set(self.focus_key, value=focus[i - 1], comment="This file set peak value")
-
-
             ccd.write(_file, overwrite=True)
 
-        print(self.file_list)
+
+    def tearDown(self) -> None:
+        for _file in self.file_list:
+            if os.path.isfile(_file):
+                os.unlink(_file)
 
     def test_get_best_image_by_peak(self):
         best_image = get_best_image_by_peak(file_list=self.file_list,

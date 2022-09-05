@@ -7,4 +7,4 @@ pandas
 scikit-learn
 scipy
 Sphinx
-photutils
+photutils>=1.4.0
