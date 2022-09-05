@@ -25,10 +25,10 @@ from typing import List
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
-from utils import (circular_aperture_photometry,
-                   get_best_image_by_peak,
-                   plot_sources_and_masked_data,
-                   setup_logging)
+from .utils import (circular_aperture_statistics,
+                    get_best_image_by_peak,
+                    plot_sources_and_masked_data,
+                    setup_logging)
 
 plt.style.use('dark_background')
 
@@ -125,7 +125,7 @@ class TripleSpecFocus(object):
         for _file in self.file_list:
             self.log.info(f"Processing file: {_file}")
             ccd = CCDData.read(_file, unit='adu')
-            photometry = circular_aperture_photometry(ccd=ccd,
+            photometry = circular_aperture_statistics(ccd=ccd,
                                                       positions=positions,
                                                       aperture_radius=self.source_fwhm,
                                                       filename_key=self.filename_key,
@@ -255,7 +255,7 @@ class TripleSpecFocus(object):
 
     def filter_sources(self, ccd: CCDData, sources: QTable, plot: bool = False) -> DataFrame:
         positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
-        photometry = circular_aperture_photometry(ccd=ccd,
+        photometry = circular_aperture_statistics(ccd=ccd,
                                                   positions=positions,
                                                   aperture_radius=self.source_fwhm,
                                                   filename_key=self.filename_key,

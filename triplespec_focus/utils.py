@@ -22,7 +22,7 @@ from photutils import CircularAperture, CircularAnnulus, ApertureStats
 log = logging.getLogger(__name__)
 
 
-def circular_aperture_photometry(ccd: CCDData,
+def circular_aperture_statistics(ccd: CCDData,
                                  positions: np.ndarray,
                                  aperture_radius: float = 10,
                                  filename_key: str = 'FILENAME',
@@ -40,14 +40,14 @@ def circular_aperture_photometry(ccd: CCDData,
         if col not in ['filename']:
             as_table[col].info.format = '%.8g'
 
-    if plot:
+    if plot:  # pragma: no cover
         title = f"Photometry of {ccd.header['FILENAME']}"
         plot_sources_and_masked_data(ccd=ccd, positions=positions, title=title)
 
     return as_table.to_pandas()
 
 
-def get_args(arguments: Union[list, None] = None) -> Namespace:
+def get_args(arguments: Union[List, None] = None) -> Namespace:
     parser = argparse.ArgumentParser(
         description="Get best focus value using a sequence of images with "
                     "different focus value"
@@ -80,12 +80,14 @@ def get_args(arguments: Union[list, None] = None) -> Namespace:
     parser.add_argument('--brightest',
                         action='store',
                         dest='brightest',
+                        type=int,
                         default=5,
                         help='Pick N-brightest sources to perform statistics. Default 5.')
 
     parser.add_argument('--saturation',
                         action='store',
                         dest='saturation',
+                        type=int,
                         default=40000,
                         help='Saturation value for data')
 
@@ -140,8 +142,11 @@ def get_best_image_by_peak(file_list: List, saturation_level: float = 40000., fo
         ccd.mask = ccd.data >= saturation_level
         masked_data = ma.masked_array(ccd.data, mask=ccd.mask)
         np_max = ma.MaskedArray.max(masked_data)
-        log.debug(f"File: {os.path.basename(f)} Max: {np_max} Focus: {ccd.header[focus_key]}")
-        data.append([f, np_max, ccd.header[focus_key]])
+        if not ma.is_masked(np_max):
+            log.debug(f"File: {os.path.basename(f)} Max: {np_max} Focus: {ccd.header[focus_key]}")
+            data.append([f, np_max, ccd.header[focus_key]])
+        else:
+            log.debug(f"Rejected masked value {np_max} from file {f}")
 
     df = pd.DataFrame(data, columns=['file', 'peak', 'focus'])
     best_image = df.iloc[df['peak'].idxmax()]
@@ -150,7 +155,7 @@ def get_best_image_by_peak(file_list: List, saturation_level: float = 40000., fo
     return best_image.to_list()
 
 
-def plot_sources_and_masked_data(ccd: CCDData, positions: np.ndarray, title: str = '', mask=None, aperture_radius: int = 10):
+def plot_sources_and_masked_data(ccd: CCDData, positions: np.ndarray, title: str = '', aperture_radius: int = 10):  # pragma: no cover
     fig, ax = plt.subplots(figsize=(16, 9))
     ax.set_title(title)
 
@@ -180,8 +185,8 @@ def setup_logging(debug: bool = False) -> Logger:
 
     date_format = '%H:%M:%S'
 
-    logging.basicConfig(level=log_level,
-                        format=log_format,
+    logging.basicConfig(format=log_format,
                         datefmt=date_format)
     logger = logging.getLogger(__name__)
+    logger.setLevel(level=log_level)
     return logger
