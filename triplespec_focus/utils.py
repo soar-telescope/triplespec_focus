@@ -65,6 +65,18 @@ def get_args(arguments: Union[list, None] = None) -> Namespace:
                         default='*.fits',
                         help='Pattern for filtering files.')
 
+    parser.add_argument('--focus-key',
+                        action='store',
+                        dest='focus_key',
+                        default='TELFOCUS',
+                        help='FITS header keyword to find the focus value.')
+
+    parser.add_argument('--filename-key',
+                        action='store',
+                        dest='filename_key',
+                        default='FILENAME',
+                        help='FITS header keyword to find the current file name.')
+
     parser.add_argument('--obstype',
                         action='store',
                         dest='obstype',
@@ -76,8 +88,14 @@ def get_args(arguments: Union[list, None] = None) -> Namespace:
     parser.add_argument('--brightest',
                         action='store',
                         dest='brightest',
-                        default=1,
-                        help='Pick N-brightest sources. Default 1.')
+                        default=5,
+                        help='Pick N-brightest sources to perform statistics. Default 5.')
+
+    parser.add_argument('--saturation',
+                        action='store',
+                        dest='saturation',
+                        default=40000,
+                        help='Saturation value for data')
 
     parser.add_argument('--plot-results',
                         action='store_true',
