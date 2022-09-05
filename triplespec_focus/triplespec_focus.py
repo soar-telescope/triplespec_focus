@@ -1,6 +1,5 @@
 import copy
 import glob
-import json
 import logging.config
 import os
 
@@ -22,12 +21,11 @@ from photutils import DAOStarFinder
 from photutils import CircularAperture
 
 from scipy import optimize
-from typing import Union, List
+from typing import List
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 from utils import (circular_aperture_photometry,
-                   get_args,
                    get_best_image_by_peak,
                    plot_sources_and_masked_data,
                    setup_logging)
@@ -78,9 +76,8 @@ class TripleSpecFocus(object):
                  n_brightest: int = 5,
                  saturation_level: float = 40000.,
                  show_mask: bool = False,
-                 show_source: bool = False,
                  plot_results: bool = False,
-                 debug_plots: bool = True,
+                 debug_plots: bool = False,
                  print_all_data: bool = False) -> List[dict]:
         """Find focus for triplespec SV camera
 
@@ -93,7 +90,6 @@ class TripleSpecFocus(object):
             det_threshold:
             mask_threshold:
             show_mask:
-            show_source:
 
         Returns:
 
@@ -101,10 +97,9 @@ class TripleSpecFocus(object):
         self.data_path: str = data_path
         self.source_fwhm: float = source_fwhm
         self.det_threshold: float = det_threshold
-        self.mask_threshold = mask_threshold
+        self.mask_threshold: float = mask_threshold
         self.saturation_level: float = saturation_level
         self.show_mask: bool = show_mask
-        self.show_source: bool = show_source
         self.n_brightest: int = n_brightest
         self.plot_results: bool = plot_results
         self.results = []
@@ -114,7 +109,10 @@ class TripleSpecFocus(object):
         else:
             self.file_list = sorted(glob.glob(Path.joinpath(data_path, '*.fits')))
 
-        best_image, peak, focus = get_best_image_by_peak(file_list=self.file_list)
+        best_image, peak, focus = get_best_image_by_peak(file_list=self.file_list,
+                                                         saturation_level=self.saturation_level,
+                                                         focus_key=self.focus_key)
+
         self.log.info(f"Processing best file: {best_image}, selected by highest peak below saturation")
         best_image_ccd = CCDData.read(best_image, unit='adu')
         sources = self.detect_sources(ccd=best_image_ccd, debug_plots=self.debug_plots)
@@ -233,23 +231,23 @@ class TripleSpecFocus(object):
             if debug_plots:
                 positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
                 apertures = CircularAperture(positions, r=self.source_fwhm)
-                if self.show_source or self.show_mask:
-                    z1, z2 = self.scale.get_limits(ccd.data)
-                    fig, ax = plt.subplots(figsize=(20, 15))
-                    ax.set_title(ccd.header[self.filename_key])
 
-                    if self.show_mask:
-                        masked_data = np.ma.masked_where(ccd.data <= (median - self.mask_threshold * std), ccd.data)
-                        im = ax.imshow(masked_data, cmap=self.color_map, origin='lower', clim=(z1, z2),
-                                       interpolation='nearest')
-                    else:
-                        im = ax.imshow(ccd.data, cmap=self.color_map, origin='lower', clim=(z1, z2),
-                                       interpolation='nearest')
-                    apertures.plot(color='blue', lw=1.5, alpha=0.5)
+                z1, z2 = self.scale.get_limits(ccd.data)
+                fig, ax = plt.subplots(figsize=(20, 15))
+                ax.set_title(ccd.header[self.filename_key])
 
-                    divider = make_axes_locatable(ax)
-                    cax = divider.append_axes('right', size="3%", pad=0.1)
-                    plt.colorbar(im, cax=cax)
+                if self.show_mask:
+                    masked_data = np.ma.masked_where(ccd.data <= (median - self.mask_threshold * std), ccd.data)
+                    im = ax.imshow(masked_data, cmap=self.color_map, origin='lower', clim=(z1, z2),
+                                   interpolation='nearest')
+                else:
+                    im = ax.imshow(ccd.data, cmap=self.color_map, origin='lower', clim=(z1, z2),
+                                   interpolation='nearest')
+                apertures.plot(color='blue', lw=1.5, alpha=0.5)
+
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes('right', size="3%", pad=0.1)
+                plt.colorbar(im, cax=cax)
 
         else:
             self.log.critical(f"Unable to detect sources in file: {ccd.header[self.filename_key]}")
@@ -275,7 +273,6 @@ class TripleSpecFocus(object):
 
     def get_best_focus(self, df: DataFrame, x_axis_size: int = 2000) -> List[np.ndarray]:
 
-
         focus_start = df['focus'].min()
         focus_end = df['focus'].max()
 
@@ -291,19 +288,5 @@ class TripleSpecFocus(object):
         return [x_axis, modeled_data]
 
 
-def run_triplespec_focus(args=None):
-
-
-    args = get_args(arguments=args)
-
-    focus = TripleSpecFocus(debug=args.debug, debug_plots=args.debug_plots)
-    results = focus(data_path=args.data_path,
-                    det_threshold=6,
-                    show_mask=args.show_mask,
-                    show_source=True,
-                    plot_results=args.plot_results)
-    log.info(json.dumps(results, indent=4))
-
-
 if __name__ == '__main__':
-    run_triplespec_focus()
+    pass

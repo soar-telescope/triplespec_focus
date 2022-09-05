@@ -77,14 +77,6 @@ def get_args(arguments: Union[list, None] = None) -> Namespace:
                         default='FILENAME',
                         help='FITS header keyword to find the current file name.')
 
-    parser.add_argument('--obstype',
-                        action='store',
-                        dest='obstype',
-                        default='Focus',
-                        help='Only the files whose OBSTYPE matches what you '
-                             'enter here will be used. The default should '
-                             'always work.')
-
     parser.add_argument('--brightest',
                         action='store',
                         dest='brightest',
@@ -96,6 +88,24 @@ def get_args(arguments: Union[list, None] = None) -> Namespace:
                         dest='saturation',
                         default=40000,
                         help='Saturation value for data')
+
+    parser.add_argument('--source-fwhm',
+                        action='store',
+                        dest='source_fwhm',
+                        default=7.0,
+                        help='FWHM for source detection.')
+
+    parser.add_argument('--detection-threshold',
+                        action='store',
+                        dest='detection_threshold',
+                        default=6,
+                        help='Number of standard deviation above median for source detection.')
+
+    parser.add_argument('--mask-threshold',
+                        action='store',
+                        dest='mask_threshold',
+                        default=1,
+                        help='Number of standard deviation below median to mask values.')
 
     parser.add_argument('--plot-results',
                         action='store_true',
