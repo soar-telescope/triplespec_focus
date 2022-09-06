@@ -85,7 +85,13 @@ class TestLoggingSettings(TestCase):
 
     def test_debug_logging_setup(self):
         logger = setup_logging(debug=True)
+        astropy_logger = logging.getLogger('astropy')
         self.assertEqual(logger.level, logging.DEBUG)
+        self.assertTrue(astropy_logger.disabled)
+
+    def test_enable_astropy_logger(self):
+        logger = setup_logging(enable_astropy_logger=True)
+        self.assertEqual(logger.level, logging.INFO)
 
     def test_default_logging_setup(self):
         logger = setup_logging()

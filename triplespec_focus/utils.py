@@ -176,7 +176,7 @@ def plot_sources_and_masked_data(ccd: CCDData, positions: np.ndarray, title: str
     plt.show()
 
 
-def setup_logging(debug: bool = False, disable_astropy_logger: bool = True) -> Logger:
+def setup_logging(debug: bool = False, enable_astropy_logger: bool = False) -> Logger:
     if debug:
         log_level = logging.DEBUG
     else:
@@ -196,11 +196,11 @@ def setup_logging(debug: bool = False, disable_astropy_logger: bool = True) -> L
     logger.addHandler(console)
 
     astropy_logger = logging.getLogger('astropy')
-    if disable_astropy_logger or not debug:
-        astropy_logger.disabled = True
-    else:
+    if enable_astropy_logger or debug:
         for handler in astropy_logger.handlers:
             astropy_logger.removeHandler(handler)
         astropy_logger.addHandler(console)
+    else:
+        astropy_logger.disabled = True
 
     return logger
