@@ -1,7 +1,7 @@
 import copy
-import glob
 import logging.config
 import os
+import sys
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ from photutils import DAOStarFinder
 from photutils import CircularAperture
 
 from scipy import optimize
-from typing import List
+from typing import List, Union
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
@@ -32,7 +32,7 @@ from .utils import (circular_aperture_statistics,
 
 plt.style.use('dark_background')
 
-log = logging.getLogger(__name__)
+# log = logging.getLogger(__name__)
 
 
 class TripleSpecFocus(object):
@@ -54,6 +54,10 @@ class TripleSpecFocus(object):
         self.debug: bool = debug
         self.debug_plots: bool = debug_plots
         self.plot_results: bool = plot_results
+        self.mask_threshold: float = 1
+        self.source_fwhm: float = 7.0
+        self.det_threshold: float = 5.0
+        self.show_mask: bool = False
 
         self.masked_data = None
         self.file_list: List
@@ -68,8 +72,8 @@ class TripleSpecFocus(object):
         self.color_map.set_bad(color='red')
 
     def __call__(self,
-                 data_path: str,
-                 file_list: List = [],
+                 data_path: Union[Path, str, None] = None,
+                 file_list: Union[List, None] = None,
                  source_fwhm: float = 7.0,
                  det_threshold: float = 5.0,
                  mask_threshold: float = 1,
@@ -94,7 +98,18 @@ class TripleSpecFocus(object):
         Returns:
 
         """
-        self.data_path: str = data_path
+        if file_list:
+            self.log.debug(f"Using provided file list containing {len(file_list)} files.")
+            self.file_list = file_list
+        elif data_path:
+            self.data_path: Path = Path(data_path)
+            self.log.debug(f"File list not provided, creating file list from path: {data_path}")
+            self.file_list = sorted(self.data_path.glob(pattern='*fits'))
+            self.log.info(f"Found {len(self.file_list)} files at {self.data_path}")
+        else:
+            self.log.critical("You must provide at least a data_path or a file_list value")
+            sys.exit(0)
+
         self.source_fwhm: float = source_fwhm
         self.det_threshold: float = det_threshold
         self.mask_threshold: float = mask_threshold
@@ -104,20 +119,30 @@ class TripleSpecFocus(object):
         self.plot_results: bool = plot_results
         self.results = []
 
-        if file_list:
-            self.file_list = file_list
-        else:
-            self.file_list = sorted(glob.glob(Path.joinpath(data_path, '*.fits')))
-
         best_image, peak, focus = get_best_image_by_peak(file_list=self.file_list,
                                                          saturation_level=self.saturation_level,
                                                          focus_key=self.focus_key)
 
         self.log.info(f"Processing best file: {best_image}, selected by highest peak below saturation")
         best_image_ccd = CCDData.read(best_image, unit='adu')
-        sources = self.detect_sources(ccd=best_image_ccd, debug_plots=self.debug_plots)
 
-        brightest = self.filter_sources(ccd=best_image_ccd, sources=sources, plot=self.debug_plots)
+        sources = self.detect_sources(ccd=best_image_ccd, debug_plots=self.debug_plots)
+        sources_positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
+
+        aperture_stats = circular_aperture_statistics(ccd=best_image_ccd,
+                                                      positions=sources_positions,
+                                                      aperture_radius=self.source_fwhm,
+                                                      filename_key=self.filename_key,
+                                                      focus_key=self.focus_key,
+                                                      plot=self.debug_plots)
+
+        brightest = aperture_stats.nlargest(self.n_brightest, 'max')
+
+        if self.debug_plots:  # pragma: no cover
+            title = f"{self.n_brightest} Brightest Sources"
+            positions = np.transpose((brightest['xcentroid'].tolist(), brightest['ycentroid'].tolist()))
+            plot_sources_and_masked_data(ccd=best_image_ccd, positions=positions, title=title)
+
         positions = np.transpose((brightest['xcentroid'].tolist(), brightest['ycentroid'].tolist()))
 
         all_photometry = []
@@ -137,7 +162,7 @@ class TripleSpecFocus(object):
         self.sources_df = pd.concat(all_photometry).sort_values(by='focus').reset_index(level=0)
         self.sources_df['index'] = self.sources_df.index
 
-        if self.debug_plots:
+        if self.debug_plots:   # pragma: no cover
             plt.show()
 
         star_ids = self.sources_df.id.unique().tolist()
@@ -153,7 +178,6 @@ class TripleSpecFocus(object):
         mean_focus = np.mean(all_focus)
         median_focus = np.median(all_focus)
         focus_std = np.std(all_focus)
-        print(type(mean_focus), type(median_focus), type(focus_std))
 
         self.results.append({'date': 'focus_group',
                              'time': '',
@@ -170,7 +194,7 @@ class TripleSpecFocus(object):
                              })
         self.log.debug(f"Best Focus... Mean: {mean_focus}, median: {median_focus}, std: {focus_std}")
 
-        if self.plot_results:
+        if self.plot_results:   # pragma: no cover
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
 
             apertures = CircularAperture(positions=positions, r=1.5 * self.source_fwhm)
@@ -197,7 +221,7 @@ class TripleSpecFocus(object):
             ax2.set_title(f"Best Focus: {mean_focus}")
             ax2.legend(loc='best')
             plt.show()
-        if print_all_data:
+        if print_all_data:  # pragma: no cover
             print(self.sources_df.to_string())
         return self.results
 
@@ -209,7 +233,7 @@ class TripleSpecFocus(object):
         self.masked_data = np.ma.masked_where(ccd.data <= (median - self.mask_threshold * std), ccd.data)
 
         self.log.debug(f"Show Mask: {self.show_mask}")
-        if self.show_mask:
+        if self.show_mask:  # pragma: no cover
             fig, ax = plt.subplots(figsize=(20, 15))
             ax.set_title(f"Bad Pixel Mask\nValues {self.mask_threshold} Std below median are masked")
             ax.imshow(self.masked_data, cmap=self.color_map, origin='lower', interpolation='nearest')
@@ -228,7 +252,7 @@ class TripleSpecFocus(object):
                 if col != 'filename':
                     sources[col].info.format = '%.8g'
 
-            if debug_plots:
+            if debug_plots:  # pragma: no cover
                 positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
                 apertures = CircularAperture(positions, r=self.source_fwhm)
 
@@ -253,26 +277,7 @@ class TripleSpecFocus(object):
             self.log.critical(f"Unable to detect sources in file: {ccd.header[self.filename_key]}")
         return sources
 
-    def filter_sources(self, ccd: CCDData, sources: QTable, plot: bool = False) -> DataFrame:
-        positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
-        photometry = circular_aperture_statistics(ccd=ccd,
-                                                  positions=positions,
-                                                  aperture_radius=self.source_fwhm,
-                                                  filename_key=self.filename_key,
-                                                  focus_key=self.focus_key,
-                                                  plot=plot)
-
-        brightest = photometry.nlargest(self.n_brightest, 'max')
-
-        if plot:
-            title = f"{self.n_brightest} Brightest Sources"
-            positions = np.transpose((brightest['xcentroid'].tolist(), brightest['ycentroid'].tolist()))
-            plot_sources_and_masked_data(ccd=ccd, positions=positions, title=title)
-
-        return brightest
-
     def get_best_focus(self, df: DataFrame, x_axis_size: int = 2000) -> List[np.ndarray]:
-
         focus_start = df['focus'].min()
         focus_end = df['focus'].max()
 

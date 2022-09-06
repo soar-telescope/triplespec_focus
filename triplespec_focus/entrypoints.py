@@ -1,6 +1,6 @@
 import json
 
-from .utils import get_args, setup_logging
+from .utils import get_args
 from .triplespec_focus import TripleSpecFocus
 
 
@@ -27,3 +27,7 @@ def run_triplespec_focus(args=None):
                     debug_plots=args.debug_plots,
                     print_all_data=False)
     print(json.dumps(results, indent=4))
+
+
+if __name__ == '__main__':
+    run_triplespec_focus()
