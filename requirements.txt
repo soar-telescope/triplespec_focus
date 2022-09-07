@@ -1,6 +1,7 @@
 setuptools
 astropy
 ccdproc
+coveralls
 matplotlib
 numpy
 pandas
