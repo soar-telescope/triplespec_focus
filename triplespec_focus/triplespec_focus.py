@@ -39,6 +39,8 @@ class TripleSpecFocus(object):
 
     def __init__(self,
                  debug: bool = False,
+                 date_key: str = 'DATE',
+                 date_time_key: str = 'DATE-OBS',
                  focus_key: str = 'TELFOCUS',
                  filename_key: str = 'FILENAME',
                  n_brightest: int = 5,
@@ -46,8 +48,12 @@ class TripleSpecFocus(object):
                  plot_results: bool = False,
                  debug_plots: bool = False) -> None:
 
+        self.best_fwhm = None
         self.best_focus = None
         self.fitted_model = None
+        self.best_image_overall = None
+        self.date_key: str = date_key
+        self.date_time_key: str = date_time_key
         self.focus_key: str = focus_key
         self.filename_key: str = filename_key
         self.saturation_level = saturation
@@ -122,6 +128,7 @@ class TripleSpecFocus(object):
         best_image, peak, focus = get_best_image_by_peak(file_list=self.file_list,
                                                          saturation_level=self.saturation_level,
                                                          focus_key=self.focus_key)
+        self.best_image_overall = best_image
 
         self.log.info(f"Processing best file: {best_image}, selected by highest peak below saturation")
         best_image_ccd = CCDData.read(best_image, unit='adu')
@@ -178,20 +185,34 @@ class TripleSpecFocus(object):
         mean_focus = np.mean(all_focus)
         median_focus = np.median(all_focus)
         focus_std = np.std(all_focus)
+        mean_fwhm = np.mean(all_fwhm)
 
-        self.results.append({'date': 'focus_group',
-                             'time': '',
-                             'notes': '',
-                             'mean_focus': round(mean_focus, 10),
-                             'median_focus': round(median_focus, 10),
-                             'focus_std': round(focus_std, 10),
-                             # 'fwhm': round(self.__best_fwhm, 10),
-                             'best_image_name': os.path.basename(best_image),
-                             'best_image_focus': best_image_ccd.header[self.focus_key],
-                             # 'best_image_fwhm': round(self.__best_image_fwhm, 10),
-                             # 'focus_data': cluster['focus'].tolist(),
-                             # 'mag_data': cluster['mag'].tolist()
-                             })
+        best_image_overall = CCDData.read(self.best_image_overall, unit='adu')
+        self.best_image_fwhm = self.sources_df[self.sources_df['filename'] == os.path.basename(self.best_image_overall)]['fwhm'].mean()
+
+        focus_data = []
+        fwhm_data = []
+        images = self.sources_df.filename.unique().tolist()
+        for image in images:
+            summary_df = self.sources_df[self.sources_df['filename'] == image]
+            focus = summary_df.focus.unique().tolist()
+            fwhm = summary_df.fwhm.tolist()
+            if len(focus) == 1:
+                focus_data.append(focus[0])
+                fwhm_data.append(round(np.mean(fwhm), 10))
+
+        self.results = {'date': best_image_overall.header[self.date_key],
+                        'time': best_image_overall.header[self.date_time_key],
+                        'mean_focus': round(mean_focus, 10),
+                        'median_focus': round(median_focus, 10),
+                        'focus_std': round(focus_std, 10),
+                        'fwhm': round(mean_fwhm, 10),
+                        'best_image_name': os.path.basename(self.best_image_overall),
+                        'best_image_focus': best_image_overall.header[self.focus_key],
+                        'best_image_fwhm': round(self.best_image_fwhm, 10),
+                        'focus_data': focus_data,
+                        'fwhm_data': fwhm_data
+                        }
         self.log.debug(f"Best Focus... Mean: {mean_focus}, median: {median_focus}, std: {focus_std}")
 
         if self.plot_results:   # pragma: no cover
