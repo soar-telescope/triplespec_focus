@@ -42,6 +42,7 @@ class TripleSpecFocus(object):
                  date_time_key: str = 'DATE-OBS',
                  focus_key: str = 'TELFOCUS',
                  filename_key: str = 'FILENAME',
+                 file_pattern: str = '*.fits',
                  n_brightest: int = 5,
                  saturation: float = 40000,
                  plot_results: bool = False,
@@ -55,6 +56,7 @@ class TripleSpecFocus(object):
         self.date_time_key: str = date_time_key
         self.focus_key: str = focus_key
         self.filename_key: str = filename_key
+        self.file_pattern: str = file_pattern
         self.saturation_level = saturation
         self.debug: bool = debug
         self.debug_plots: bool = debug_plots
@@ -109,7 +111,7 @@ class TripleSpecFocus(object):
         elif data_path:
             self.data_path: Path = Path(data_path)
             self.log.debug(f"File list not provided, creating file list from path: {data_path}")
-            self.file_list = sorted(self.data_path.glob(pattern='*fits'))
+            self.file_list = sorted(self.data_path.glob(pattern=self.file_pattern))
             self.log.info(f"Found {len(self.file_list)} files at {self.data_path}")
         else:
             self.log.critical("You must provide at least a data_path or a file_list value")
