@@ -14,6 +14,7 @@ This library can be integrated into other software, just import ``TripleSpecFocu
                            date_time_key='DATE-OBS',
                            focus_key='TELFOCUS',
                            filename_key='FILENAME',
+                           file_pattern='*.fits',
                            n_brightest=5,
                            saturation=40000,
                            plot_results=False,

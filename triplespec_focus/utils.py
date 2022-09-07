@@ -26,6 +26,22 @@ def circular_aperture_statistics(ccd: CCDData,
                                  filename_key: str = 'FILENAME',
                                  focus_key: str = 'TELFOCUS',
                                  plot: bool = False) -> DataFrame:
+    """Obtain aperture statistics from a FITS file with point sources
+
+    Uses CircularAperture from photutils to obtain several data but the most important is the FWHM
+
+    Args:
+        ccd (CCDData): An image with point sources.
+        positions (numpy.ndarray): Coordinates of the sources to be measured.
+        aperture_radius (float): Aperture size for obtaining measurements. Default 10.
+        filename_key (str): FITS keyword name for obtaining the file name from the FITS file. Default FILENAME.
+        focus_key (str): FITS keyword name for obtaining the focus value from the FITS file. Default TELFOCUS.
+        plot (bool): If set to True will display a plot of the image and the measured sources.
+
+    Returns:
+        A DataFrame containing the following columns: id, mean, fwhm, max, xcentroid, ycentroid and filename.
+
+    """
     apertures = CircularAperture(positions, r=aperture_radius)
 
     aper_stats = ApertureStats(ccd.data, apertures, sigma_clip=None)
@@ -46,6 +62,15 @@ def circular_aperture_statistics(ccd: CCDData,
 
 
 def get_args(arguments: Union[List, None] = None) -> Namespace:
+    """Helper function to get the console arguments using argparse.
+
+    Args:
+        arguments (List, None): Optional list of arguments. Default None.
+
+    Returns:
+        An instance of arparse's Namespace.
+
+    """
     parser = ArgumentParser(
         description="Get best focus value using a sequence of images with "
                     "different focus value"
@@ -133,7 +158,20 @@ def get_args(arguments: Union[List, None] = None) -> Namespace:
 
 
 def get_best_image_by_peak(file_list: List, saturation_level: float = 40000., focus_key: str = 'TELFOCUS') -> List:
+    """Select the best image by its peak value
 
+    The best peak must be the highest below the saturation level, therefore the data is first masked and then sorted
+    by the peak.
+
+    Args:
+        file_list (List): The list of images to be used.
+        saturation_level (float): Data level at which the image saturates. Default 40000.
+        focus_key (str): FITS keyword name for obtaining the focus value from the FITS file. Default TELFOCUS.
+
+    Returns:
+        A list wit the best image according to the criteria described above.
+
+    """
     data = []
     for f in file_list:
         ccd = CCDData.read(f, unit='adu')
@@ -154,6 +192,15 @@ def get_best_image_by_peak(file_list: List, saturation_level: float = 40000., fo
 
 
 def plot_sources_and_masked_data(ccd: CCDData, positions: np.ndarray, title: str = '', aperture_radius: int = 10):  # pragma: no cover
+    """Helper function to plot data and sources
+
+    Args:
+        ccd (CCDData): The image to be shown.
+        positions (numpy.ndarray): Array of source positions to be plotted over the image.
+        title (str): Title to put to the plot. Default '' (empty string).
+        aperture_radius (int): Radius size in pixels for the drawing of the sources. Default 10.
+
+    """
     fig, ax = plt.subplots(figsize=(16, 9))
     ax.set_title(title)
 
@@ -175,6 +222,16 @@ def plot_sources_and_masked_data(ccd: CCDData, positions: np.ndarray, title: str
 
 
 def setup_logging(debug: bool = False, enable_astropy_logger: bool = False) -> Logger:
+    """Helper function to setup the logger.
+
+    Args:
+        debug (bool): If set to True will create a logger in debug level. Default False.
+        enable_astropy_logger (bool): If set to True will allow the astropy logger to remain active. Default False.
+
+    Returns:
+        A Logger instance from python's logging.
+
+    """
     if debug:
         log_level = logging.DEBUG
     else:
