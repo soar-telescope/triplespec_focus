@@ -1,13 +1,11 @@
-import argparse
 import copy
 import os
 import logging
 
 import numpy as np
 import numpy.ma as ma
-import pandas as pd
 
-from argparse import Namespace
+from argparse import ArgumentParser, Namespace
 
 from astropy.visualization import ZScaleInterval
 from ccdproc import CCDData
@@ -48,7 +46,7 @@ def circular_aperture_statistics(ccd: CCDData,
 
 
 def get_args(arguments: Union[List, None] = None) -> Namespace:
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Get best focus value using a sequence of images with "
                     "different focus value"
     )
@@ -148,7 +146,7 @@ def get_best_image_by_peak(file_list: List, saturation_level: float = 40000., fo
         else:
             log.debug(f"Rejected masked value {np_max} from file {f}")
 
-    df = pd.DataFrame(data, columns=['file', 'peak', 'focus'])
+    df = DataFrame(data, columns=['file', 'peak', 'focus'])
     best_image = df.iloc[df['peak'].idxmax()]
     log.info(f"Best Image: {best_image.file} Peak: {best_image.peak} Focus: {best_image.focus}")
 

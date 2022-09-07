@@ -6,7 +6,6 @@ import sys
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
 from astropy.modeling import Model
 from astropy.modeling import fitting, models
@@ -16,6 +15,7 @@ from astropy.visualization import ZScaleInterval
 from ccdproc import CCDData
 
 from pandas import DataFrame
+from pandas import concat
 from pathlib import Path
 from photutils import DAOStarFinder
 from photutils import CircularAperture
@@ -159,7 +159,7 @@ class TripleSpecFocus(object):
             if photometry is not None:
                 all_photometry.append(photometry)
 
-        self.sources_df = pd.concat(all_photometry).sort_values(by='focus').reset_index(level=0)
+        self.sources_df = concat(all_photometry).sort_values(by='focus').reset_index(level=0)
         self.sources_df['index'] = self.sources_df.index
 
         if self.debug_plots:   # pragma: no cover
