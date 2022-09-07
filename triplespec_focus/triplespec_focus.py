@@ -1,5 +1,4 @@
 import copy
-import logging.config
 import os
 import sys
 
@@ -176,11 +175,12 @@ class TripleSpecFocus(object):
 
         all_stars_photometry = []
         all_focus = []
+        all_fwhm = []
         for star_id in star_ids:
             star_phot = self.sources_df[self.sources_df['id'] == star_id]
-            interpolated_data = self.get_best_focus(df=star_phot)
-            all_stars_photometry.append([star_phot, interpolated_data, self.best_focus])
+            self.get_best_focus(df=star_phot)
             all_focus.append(self.best_focus)
+            all_fwhm.append(self.best_fwhm)
 
         mean_focus = np.mean(all_focus)
         median_focus = np.median(all_focus)
@@ -241,6 +241,7 @@ class TripleSpecFocus(object):
             ax2.axvline(mean_focus, color="lawngreen", label='Best Focus')
             ax2.set_title(f"Best Focus: {mean_focus}")
             ax2.legend(loc='best')
+            plt.tight_layout()
             plt.show()
         if print_all_data:  # pragma: no cover
             print(self.sources_df.to_string())
@@ -310,6 +311,7 @@ class TripleSpecFocus(object):
         middle_point = x_axis[index_of_minimum]
 
         self.best_focus = optimize.brent(self.fitted_model, brack=(focus_start, middle_point, focus_end))
+        self.best_fwhm = modeled_data[index_of_minimum]
 
         return [x_axis, modeled_data]
 
