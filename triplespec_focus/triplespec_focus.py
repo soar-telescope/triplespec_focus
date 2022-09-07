@@ -194,11 +194,13 @@ class TripleSpecFocus(object):
 
         star_ids = self.sources_df.id.unique().tolist()
 
+        all_stars_photometry = []
         all_focus = []
         all_fwhm = []
         for star_id in star_ids:
             star_phot = self.sources_df[self.sources_df['id'] == star_id]
-            self.get_best_focus(df=star_phot)
+            interpolated_data = self.get_best_focus(df=star_phot)
+            all_stars_photometry.append([star_phot, interpolated_data, self.best_focus])
             all_focus.append(self.best_focus)
             all_fwhm.append(self.best_fwhm)
 
