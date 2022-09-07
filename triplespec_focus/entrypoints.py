@@ -11,6 +11,7 @@ def run_triplespec_focus(args=None):
     focus = TripleSpecFocus(debug=args.debug,
                             focus_key=args.focus_key,
                             filename_key=args.filename_key,
+                            file_pattern=args.file_pattern,
                             n_brightest=args.brightest,
                             saturation=args.saturation,
                             plot_results=args.plot_results,

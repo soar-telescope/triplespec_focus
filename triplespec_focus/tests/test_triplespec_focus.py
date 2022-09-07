@@ -1,18 +1,12 @@
-import datetime
-from pathlib import Path
-
-import numpy as np
-import logging
+import os
 import requests
 
-import os
-
-from astropy.io import fits
-from astropy.modeling import models, Model
+from astropy.modeling import Model
 from astropy.table import QTable
-from pandas import DataFrame
-from unittest import TestCase
 from ccdproc import CCDData
+from pandas import DataFrame
+from pathlib import Path
+from unittest import TestCase
 
 from ..triplespec_focus import TripleSpecFocus
 
@@ -53,11 +47,6 @@ class TripleSpecFocusTest(TestCase):
                     print(f"Downloading file: {_file}")
                     test_file.write(response.content)
 
-    # def tearDown(self) -> None:
-    #     for _test_file in self.all_files:
-    #         if os.path.isfile(_test_file):
-    #             os.unlink(_test_file)
-
     def test_instance_is_correct(self):
         self.assertIsInstance(self.tspec_focus, TripleSpecFocus)
 
@@ -91,14 +80,14 @@ class TripleSpecFocusTest(TestCase):
     def test_call_with_data_path(self):
 
         results = self.tspec_focus(data_path='./')
-        self.assertIsInstance(results, list)
-        self.assertEqual(len(results), 1)
+        self.assertIsInstance(results, dict)
+        self.assertEqual(len(results), 11)
 
     def test_call_with_file_list(self):
         data_path = Path('./')
 
         results = self.tspec_focus(file_list=sorted(data_path.glob(pattern='*.fits')))
-        self.assertIsInstance(results, list)
-        self.assertEqual(len(results), 1)
+        self.assertIsInstance(results, dict)
+        self.assertEqual(len(results), 11)
 
 

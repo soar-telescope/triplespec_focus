@@ -1,12 +1,10 @@
 import copy
-import logging.config
 import os
 import sys
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 
 from astropy.modeling import Model
 from astropy.modeling import fitting, models
@@ -16,6 +14,7 @@ from astropy.visualization import ZScaleInterval
 from ccdproc import CCDData
 
 from pandas import DataFrame
+from pandas import concat
 from pathlib import Path
 from photutils import DAOStarFinder
 from photutils import CircularAperture
@@ -39,17 +38,39 @@ class TripleSpecFocus(object):
 
     def __init__(self,
                  debug: bool = False,
+                 date_key: str = 'DATE',
+                 date_time_key: str = 'DATE-OBS',
                  focus_key: str = 'TELFOCUS',
                  filename_key: str = 'FILENAME',
+                 file_pattern: str = '*.fits',
                  n_brightest: int = 5,
                  saturation: float = 40000,
                  plot_results: bool = False,
                  debug_plots: bool = False) -> None:
+        """Focus Calculator for the TripleSpec's Slit Viewer Camera
 
+        Args:
+            debug (bool): If set to True will set the logger to debug level.
+            date_key (str): FITS keyword name for obtaining the date from the FITS file. Default DATE.
+            date_time_key (str): FITS keyword name for obtaining the date and time from the FITS file. Default DATE-OBS.
+            focus_key (str): FITS keyword name for obtaining the focus value from the FITS file. Default TELFOCUS.
+            filename_key (str): FITS keyword name for obtaining the file name from the FITS file. Default FILENAME.
+            file_pattern (str): Pattern for searching files in the provided data path. Default *.fits.
+            n_brightest (int): Number of the brightest sources to use for measuring source statistics. Default 5.
+            saturation (float): Data value at which the detector saturates. Default 40000.
+            plot_results (bool): If set to True will display information plots at the end. Default False.
+            debug_plots (bool): If set to True will display several plots useful for debugging or viewing the process. Default False.
+        """
+
+        self.best_fwhm = None
         self.best_focus = None
         self.fitted_model = None
+        self.best_image_overall = None
+        self.date_key: str = date_key
+        self.date_time_key: str = date_time_key
         self.focus_key: str = focus_key
         self.filename_key: str = filename_key
+        self.file_pattern: str = file_pattern
         self.saturation_level = saturation
         self.debug: bool = debug
         self.debug_plots: bool = debug_plots
@@ -82,21 +103,26 @@ class TripleSpecFocus(object):
                  show_mask: bool = False,
                  plot_results: bool = False,
                  debug_plots: bool = False,
-                 print_all_data: bool = False) -> List[dict]:
-        """Find focus for triplespec SV camera
+                 print_all_data: bool = False) -> dict:
+        """Runs the focus calculation routine
 
-        Finds best focus for TripleSpec Slit Viewer camera
-        Illuminated Section: '[23:940,115:890]'
-        Best Region of Interest: '[272:690,472:890]'
+        This method contains all the logic to obtain the best focus, additionally you can parse the following parameters
+
         Args:
-            data_path:
-            source_fwhm:
-            det_threshold:
-            mask_threshold:
-            show_mask:
+            data_path (Path, str, None): Optional data path to obtain files according to file_pattern. Default None.
+            file_list (List, None): Optional file list with files to be used to obtain best focus. Default None.
+            source_fwhm (float): Full width at half maximum to use for source detection and statistics.
+            det_threshold (float): Number of standard deviation above median to use as detection threshold. Default 5.0.
+            mask_threshold (float): Number of standard deviation below median to use as a threshold for masking values. Default 1.
+            n_brightest (int): Number of the brightest sources to use for measuring source statistics. Default 5.
+            saturation_level (float): Data value at which the detector saturates. Default 40000.
+            show_mask (bool): If set to True will display masked values in red when debug_plots is also True: Default False.
+            plot_results (bool): If set to True will display information plots at the end. Default False.
+            debug_plots (bool): If set to True will display several plots useful for debugging or viewing the process. Default False.
+            print_all_data (bool): If set to True will print the entire dataset at the end.
 
         Returns:
-
+            A dictionary containing information regarding the current process.
         """
         if file_list:
             self.log.debug(f"Using provided file list containing {len(file_list)} files.")
@@ -104,7 +130,7 @@ class TripleSpecFocus(object):
         elif data_path:
             self.data_path: Path = Path(data_path)
             self.log.debug(f"File list not provided, creating file list from path: {data_path}")
-            self.file_list = sorted(self.data_path.glob(pattern='*fits'))
+            self.file_list = sorted(self.data_path.glob(pattern=self.file_pattern))
             self.log.info(f"Found {len(self.file_list)} files at {self.data_path}")
         else:
             self.log.critical("You must provide at least a data_path or a file_list value")
@@ -122,6 +148,7 @@ class TripleSpecFocus(object):
         best_image, peak, focus = get_best_image_by_peak(file_list=self.file_list,
                                                          saturation_level=self.saturation_level,
                                                          focus_key=self.focus_key)
+        self.best_image_overall = best_image
 
         self.log.info(f"Processing best file: {best_image}, selected by highest peak below saturation")
         best_image_ccd = CCDData.read(best_image, unit='adu')
@@ -159,7 +186,7 @@ class TripleSpecFocus(object):
             if photometry is not None:
                 all_photometry.append(photometry)
 
-        self.sources_df = pd.concat(all_photometry).sort_values(by='focus').reset_index(level=0)
+        self.sources_df = concat(all_photometry).sort_values(by='focus').reset_index(level=0)
         self.sources_df['index'] = self.sources_df.index
 
         if self.debug_plots:   # pragma: no cover
@@ -169,29 +196,45 @@ class TripleSpecFocus(object):
 
         all_stars_photometry = []
         all_focus = []
+        all_fwhm = []
         for star_id in star_ids:
             star_phot = self.sources_df[self.sources_df['id'] == star_id]
             interpolated_data = self.get_best_focus(df=star_phot)
             all_stars_photometry.append([star_phot, interpolated_data, self.best_focus])
             all_focus.append(self.best_focus)
+            all_fwhm.append(self.best_fwhm)
 
         mean_focus = np.mean(all_focus)
         median_focus = np.median(all_focus)
         focus_std = np.std(all_focus)
+        mean_fwhm = np.mean(all_fwhm)
 
-        self.results.append({'date': 'focus_group',
-                             'time': '',
-                             'notes': '',
-                             'mean_focus': round(mean_focus, 10),
-                             'median_focus': round(median_focus, 10),
-                             'focus_std': round(focus_std, 10),
-                             # 'fwhm': round(self.__best_fwhm, 10),
-                             'best_image_name': os.path.basename(best_image),
-                             'best_image_focus': best_image_ccd.header[self.focus_key],
-                             # 'best_image_fwhm': round(self.__best_image_fwhm, 10),
-                             # 'focus_data': cluster['focus'].tolist(),
-                             # 'mag_data': cluster['mag'].tolist()
-                             })
+        best_image_overall = CCDData.read(self.best_image_overall, unit='adu')
+        self.best_image_fwhm = self.sources_df[self.sources_df['filename'] == os.path.basename(self.best_image_overall)]['fwhm'].mean()
+
+        focus_data = []
+        fwhm_data = []
+        images = self.sources_df.filename.unique().tolist()
+        for image in images:
+            summary_df = self.sources_df[self.sources_df['filename'] == image]
+            focus = summary_df.focus.unique().tolist()
+            fwhm = summary_df.fwhm.tolist()
+            if len(focus) == 1:
+                focus_data.append(focus[0])
+                fwhm_data.append(round(np.mean(fwhm), 10))
+
+        self.results = {'date': best_image_overall.header[self.date_key],
+                        'time': best_image_overall.header[self.date_time_key],
+                        'mean_focus': round(mean_focus, 10),
+                        'median_focus': round(median_focus, 10),
+                        'focus_std': round(focus_std, 10),
+                        'fwhm': round(mean_fwhm, 10),
+                        'best_image_name': os.path.basename(self.best_image_overall),
+                        'best_image_focus': best_image_overall.header[self.focus_key],
+                        'best_image_fwhm': round(self.best_image_fwhm, 10),
+                        'focus_data': focus_data,
+                        'fwhm_data': fwhm_data
+                        }
         self.log.debug(f"Best Focus... Mean: {mean_focus}, median: {median_focus}, std: {focus_std}")
 
         if self.plot_results:   # pragma: no cover
@@ -220,12 +263,25 @@ class TripleSpecFocus(object):
             ax2.axvline(mean_focus, color="lawngreen", label='Best Focus')
             ax2.set_title(f"Best Focus: {mean_focus}")
             ax2.legend(loc='best')
+            plt.tight_layout()
             plt.show()
         if print_all_data:  # pragma: no cover
             print(self.sources_df.to_string())
         return self.results
 
     def detect_sources(self, ccd: CCDData, debug_plots: bool = False) -> QTable:
+        """Detects sources in the sharpest image
+
+        Using DAOStarFinder will detect the stellar sources in it.
+
+        Args:
+            ccd (CCDData): An image with point sources.
+            debug_plots (bool): If set to True will display the image with the sources. Default False.
+
+        Returns:
+            An Astropy's QTable containing ids, centroids, focus value and image name.
+
+        """
         mean, median, std = sigma_clipped_stats(ccd.data, sigma=3.0)
         self.log.debug(f"Mean: {mean}, Median: {median}, Standard Dev: {std}")
 
@@ -278,6 +334,16 @@ class TripleSpecFocus(object):
         return sources
 
     def get_best_focus(self, df: DataFrame, x_axis_size: int = 2000) -> List[np.ndarray]:
+        """Obtains the best focus for a single source
+
+        Args:
+            df (DataFrame): Pandas DataFrame containing at least a 'focus' and a 'fwhm' column. The data should belong to a single source.
+            x_axis_size (int): Size of the x-axis used to sample the fitted model. Is not an interpolation size.
+
+        Returns:
+            A list with the x-axis and the sampled data using the fitted model
+
+        """
         focus_start = df['focus'].min()
         focus_end = df['focus'].max()
 
@@ -289,6 +355,7 @@ class TripleSpecFocus(object):
         middle_point = x_axis[index_of_minimum]
 
         self.best_focus = optimize.brent(self.fitted_model, brack=(focus_start, middle_point, focus_end))
+        self.best_fwhm = modeled_data[index_of_minimum]
 
         return [x_axis, modeled_data]
 

@@ -1,10 +1,21 @@
-# TripleSpec Focus Calculator
+# TripleSpec Slit Viewer Focus Calculator
 
 [![TripleSpec Focus](https://github.com/soar-telescope/triplespec_focus/actions/workflows/python-package.yml/badge.svg)](https://github.com/soar-telescope/triplespec_focus/actions/workflows/python-package.yml)
+[![codecov](https://codecov.io/gh/soar-telescope/triplespec_focus/branch/main/graph/badge.svg?token=S6Y6R7AQNY)](https://codecov.io/gh/soar-telescope/triplespec_focus)
 [![Upload to PYPI](https://github.com/soar-telescope/triplespec_focus/actions/workflows/python-publish.yml/badge.svg)](https://github.com/soar-telescope/triplespec_focus/actions/workflows/python-publish.yml)
 [![Documentation Status](https://readthedocs.org/projects/triplespec-focus/badge/?version=latest)](https://triplespec-focus.readthedocs.io/en/latest/?badge=latest)
 [![pypi](https://img.shields.io/pypi/v/triplespec_focus.svg?style=flat)](https://pypi.org/project/triplespec-focus/)
-[![Total alerts](https://img.shields.io/lgtm/alerts/g/soar-telescope/triplespec_focus.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/soar-telescope/triplespec_focus/alerts/)
-[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/soar-telescope/triplespec_focus.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/soar-telescope/triplespec_focus/context:python)
+[![CodeQL](https://github.com/soar-telescope/triplespec_focus/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/soar-telescope/triplespec_focus/actions/workflows/codeql-analysis.yml)
+[![Python 3.8](https://img.shields.io/badge/Python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![GitHub license](https://img.shields.io/github/license/soar-telescope/triplespec_focus)](https://github.com/soar-telescope/triplespec_focus/blob/main/LICENSE)
 
-TripleSpec Focus Calculator
+
+![Test Coverage](https://codecov.io/gh/soar-telescope/triplespec_focus/branch/main/graphs/sunburst.svg?token=S6Y6R7AQNY)
+
+
+TripleSpec is a fixed configuration Near Infrared Spectrograph. For more information please visit [NOIRLab Official Website](https://noirlab.edu/science/programs/ctio/instruments/triplespec41-nir-imaging-spectrograph) for
+triplespec.
+
+# Documentation
+
+For documentation please visit the [ReadTheDocs Site](https://triplespec-focus.readthedocs.io/en/latest/?badge=latest) 
