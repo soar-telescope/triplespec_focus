@@ -4,7 +4,7 @@ Install with pip
 .. note::
 
    We recommend using a virtual environment management system such as
-   `astroconda <https://astroconda.readthedocs.io/en/latest/>`_
+   `stenv <https://github.com/spacetelescope/stenv>`_
 
 
 To install you need to have at least python 3.8, it is tested with python 3.9 and 3.10 as well.
