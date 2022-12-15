@@ -238,7 +238,7 @@ class TripleSpecFocus(object):
         self.log.debug(f"Best Focus... Mean: {mean_focus}, median: {median_focus}, std: {focus_std}")
 
         if self.plot_results:   # pragma: no cover
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+            fig, (ax1, ax2) = plt.subplots(1, 2)
 
             apertures = CircularAperture(positions=positions, r=1.5 * self.source_fwhm)
 
