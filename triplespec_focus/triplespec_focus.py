@@ -16,8 +16,8 @@ from ccdproc import CCDData
 from pandas import DataFrame
 from pandas import concat
 from pathlib import Path
-from photutils import DAOStarFinder
-from photutils import CircularAperture
+from photutils.detection import DAOStarFinder
+from photutils.aperture import CircularAperture
 
 from scipy import optimize
 from typing import List, Union

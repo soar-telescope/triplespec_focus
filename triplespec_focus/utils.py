@@ -15,7 +15,7 @@ from matplotlib import cm, pyplot as plt
 from pandas import DataFrame
 from typing import Union, List
 
-from photutils import CircularAperture, CircularAnnulus, ApertureStats
+from photutils.aperture import CircularAperture, CircularAnnulus, ApertureStats
 
 log = logging.getLogger(__name__)
 
