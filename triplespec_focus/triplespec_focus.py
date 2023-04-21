@@ -204,9 +204,11 @@ class TripleSpecFocus(object):
         for star_id in star_ids:
             star_phot = self.sources_df[self.sources_df['id'] == star_id]
             interpolated_data = self.get_best_focus(df=star_phot)
-            all_stars_photometry.append([star_phot, interpolated_data, self.best_focus])
-            all_focus.append(self.best_focus)
-            all_fwhm.append(self.best_fwhm)
+            if interpolated_data:
+                all_stars_photometry.append([star_phot, interpolated_data, self.best_focus])
+                if self.best_focus and self.best_fwhm:
+                    all_focus.append(self.best_focus)
+                    all_fwhm.append(self.best_fwhm)
 
         mean_focus = np.mean(all_focus)
         median_focus = np.median(all_focus)
@@ -214,7 +216,8 @@ class TripleSpecFocus(object):
         mean_fwhm = np.mean(all_fwhm)
 
         best_image_overall = CCDData.read(self.best_image_overall, unit='adu')
-        self.best_image_fwhm = self.sources_df[self.sources_df['filename'] == os.path.basename(self.best_image_overall)]['fwhm'].mean()
+        self.best_image_fwhm = self.sources_df[self.sources_df['filename'] == os.path.basename(
+            self.best_image_overall)]['fwhm'].mean()
 
         focus_data = []
         fwhm_data = []
@@ -359,11 +362,20 @@ class TripleSpecFocus(object):
         modeled_data = self.fitted_model(x_axis)
         index_of_minimum = np.argmin(modeled_data)
         middle_point = x_axis[index_of_minimum]
+        if middle_point == focus_start or middle_point == focus_end:
+            self.log.warning("The focus vs FWHM curve does not seem to have a V or U shape. Trying by forcing the "
+                             "mean focus as the middle point for Brent's optimization bracket definition.")
+            middle_point = (focus_start + focus_end) / 2.
 
-        self.best_focus = optimize.brent(self.fitted_model, brack=(focus_start, middle_point, focus_end))
-        self.best_fwhm = modeled_data[index_of_minimum]
+        self.log.debug(f"Brent optimization bracket, Start (xa): {focus_start} Middle (xb): {middle_point} End (xc): {focus_end}")
 
-        return [x_axis, modeled_data]
+        try:
+            self.best_focus = optimize.brent(self.fitted_model, brack=(focus_start, middle_point, focus_end))
+            self.best_fwhm = modeled_data[index_of_minimum]
+            self.log.info(f"Found best focus at {self.best_focus} with a fwhm of {self.best_fwhm}")
+            return [x_axis, modeled_data]
+        except ValueError as error:
+            self.log.error(error)
 
 
 if __name__ == '__main__':
