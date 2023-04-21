@@ -59,7 +59,8 @@ class TripleSpecFocus(object):
             n_brightest (int): Number of the brightest sources to use for measuring source statistics. Default 5.
             saturation (float): Data value at which the detector saturates. Default 40000.
             plot_results (bool): If set to True will display information plots at the end. Default False.
-            debug_plots (bool): If set to True will display several plots useful for debugging or viewing the process. Default False.
+            debug_plots (bool): If set to True will display several plots useful for debugging or viewing the process.
+              Default False.
         """
 
         self.best_fwhm = None
@@ -113,12 +114,15 @@ class TripleSpecFocus(object):
             file_list (List, None): Optional file list with files to be used to obtain best focus. Default None.
             source_fwhm (float): Full width at half maximum to use for source detection and statistics.
             det_threshold (float): Number of standard deviation above median to use as detection threshold. Default 5.0.
-            mask_threshold (float): Number of standard deviation below median to use as a threshold for masking values. Default 1.
+            mask_threshold (float): Number of standard deviation below median to use as a threshold for masking values.
+              Default 1.
             n_brightest (int): Number of the brightest sources to use for measuring source statistics. Default 5.
             saturation_level (float): Data value at which the detector saturates. Default 40000.
-            show_mask (bool): If set to True will display masked values in red when debug_plots is also True: Default False.
+            show_mask (bool): If set to True will display masked values in red when debug_plots is also True:
+              Default False.
             plot_results (bool): If set to True will display information plots at the end. Default False.
-            debug_plots (bool): If set to True will display several plots useful for debugging or viewing the process. Default False.
+            debug_plots (bool): If set to True will display several plots useful for debugging or viewing the process.
+              Default False.
             print_all_data (bool): If set to True will print the entire dataset at the end.
 
         Returns:
@@ -276,7 +280,8 @@ class TripleSpecFocus(object):
 
         Args:
             ccd (CCDData): An image with point sources.
-            debug_plots (bool): If set to True will display the image with the sources. Default False.
+            debug_plots (bool): If set to True will display the image with the sources.
+              Default False.
 
         Returns:
             An Astropy's QTable containing ids, centroids, focus value and image name.
@@ -337,7 +342,8 @@ class TripleSpecFocus(object):
         """Obtains the best focus for a single source
 
         Args:
-            df (DataFrame): Pandas DataFrame containing at least a 'focus' and a 'fwhm' column. The data should belong to a single source.
+            df (DataFrame): Pandas DataFrame containing at least a 'focus' and a 'fwhm' column.
+              The data should belong to a single source.
             x_axis_size (int): Size of the x-axis used to sample the fitted model. Is not an interpolation size.
 
         Returns:
