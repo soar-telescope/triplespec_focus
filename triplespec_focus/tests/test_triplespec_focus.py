@@ -89,5 +89,3 @@ class TripleSpecFocusTest(TestCase):
         results = self.tspec_focus(file_list=sorted(data_path.glob(pattern='*.fits')))
         self.assertIsInstance(results, dict)
         self.assertEqual(len(results), 11)
-
-
