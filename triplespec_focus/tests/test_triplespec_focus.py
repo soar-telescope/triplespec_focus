@@ -70,6 +70,16 @@ class TripleSpecFocusTest(TestCase):
         self.assertIsInstance(self.tspec_focus.fitted_model, Model)
         self.assertIsInstance(results, list)
 
+    def test_get_focus_with_fwhm_monotonically_increasing(self):
+        focus_values = [-1300, -1200, -1100, -1000, -900, -800, -700]
+        fwhm_values = [1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7]
+        data = {'focus': focus_values, 'fwhm': fwhm_values}
+        df = DataFrame(data=data)
+        self.assertIsNone(self.tspec_focus.best_focus)
+        self.assertIsNone(self.tspec_focus.fitted_model)
+        results = self.tspec_focus.get_best_focus(df=df, x_axis_size=2000)
+        self.assertIsNone(results)
+
     def test_detect_sources(self):
         ccd = CCDData.read(self.test_file_name, unit='adu')
         self.tspec_focus.show_mask = True
@@ -89,5 +99,3 @@ class TripleSpecFocusTest(TestCase):
         results = self.tspec_focus(file_list=sorted(data_path.glob(pattern='*.fits')))
         self.assertIsInstance(results, dict)
         self.assertEqual(len(results), 11)
-
-
