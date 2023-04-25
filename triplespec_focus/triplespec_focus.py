@@ -350,7 +350,8 @@ class TripleSpecFocus(object):
             x_axis_size (int): Size of the x-axis used to sample the fitted model. Is not an interpolation size.
 
         Returns:
-            A list with the x-axis and the sampled data using the fitted model
+            A list with the x-axis and the sampled data using the fitted model, None if it is not possible to find the
+              focus.
 
         """
         focus_start = df['focus'].min()
