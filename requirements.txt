@@ -8,4 +8,5 @@ pandas
 scikit-learn
 scipy
 Sphinx
-photutils>=1.4.0
+photutils==1.8.0
+pydata-sphinx-theme
