@@ -24,8 +24,8 @@ except PackageNotFoundError:
 # -- Project information -----------------------------------------------------
 
 project = 'TripleSpec Focus Calculator'
-copyright = '2022, Simon Torres'
-author = 'Simon Torres'
+copyright = '2022, Simón Torres'
+author = 'Simón Torres'
 license = 'bsd3'
 
 # The full version, including alpha/beta/rc tags
