@@ -24,8 +24,8 @@ except PackageNotFoundError:
 # -- Project information -----------------------------------------------------
 
 project = 'TripleSpec Focus Calculator'
-copyright = '2022, Simon Torres'
-author = 'Simon Torres'
+copyright = '2022, Simón Torres'
+author = 'Simón Torres'
 license = 'bsd3'
 
 # The full version, including alpha/beta/rc tags
@@ -64,7 +64,8 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'test_', 'tests']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+# html_theme = 'sphinx_rtd_theme'
+html_theme = 'pydata_sphinx_theme'
 html_logo = '_static/soar_logo.png'
 html_context = {'license': 'BSD 3-Clause License'}
 
