@@ -129,3 +129,6 @@ dmypy.json
 .pyre/
 
 triplespec_focus/version.py
+.tmp
+.idea
+*.DS_Store*
